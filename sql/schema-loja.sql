@@ -1,6 +1,8 @@
 -- ============================================================
 -- LOJA VIRTUAL LODJA — Schema Supabase
--- Execute no SQL Editor do Supabase (mesmo projecto do LODJA)
+-- Execute no SQL Editor do MESMO projecto do LODJA v1
+-- Depois disto, pedidos/produtos passam a gravar na cloud
+-- (deixam de depender do localStorage do browser)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS lv_categorias (
@@ -80,10 +82,16 @@ CREATE TABLE IF NOT EXISTS lv_pedidos (
   metodo_entrega TEXT,
   morada_entrega TEXT,
   observacoes TEXT,
+  lodja_cliente BOOLEAN DEFAULT false,
+  lodja_sync BOOLEAN DEFAULT false,
   data_criacao TIMESTAMPTZ DEFAULT NOW(),
   data_confirmacao TIMESTAMPTZ,
   data_conclusao TIMESTAMPTZ
 );
+
+-- Colunas extra se a tabela já existia sem elas
+ALTER TABLE lv_pedidos ADD COLUMN IF NOT EXISTS lodja_cliente BOOLEAN DEFAULT false;
+ALTER TABLE lv_pedidos ADD COLUMN IF NOT EXISTS lodja_sync BOOLEAN DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS lv_pedido_itens (
   id TEXT PRIMARY KEY,
@@ -91,10 +99,12 @@ CREATE TABLE IF NOT EXISTS lv_pedido_itens (
   produto_id TEXT,
   variacao_id TEXT,
   nome_produto TEXT,
+  nome TEXT,
   tamanho TEXT,
   cor TEXT,
   quantidade INT DEFAULT 1,
   preco_unitario NUMERIC DEFAULT 0,
+  preco NUMERIC DEFAULT 0,
   desconto NUMERIC DEFAULT 0,
   subtotal NUMERIC DEFAULT 0
 );
@@ -111,6 +121,11 @@ CREATE TABLE IF NOT EXISTS lv_promocoes (
   estado TEXT DEFAULT 'activo'
 );
 
+CREATE TABLE IF NOT EXISTS lv_config (
+  id TEXT PRIMARY KEY DEFAULT 'main',
+  data JSONB DEFAULT '{}'::jsonb
+);
+
 CREATE TABLE IF NOT EXISTS lv_sincronizacoes_lodja (
   id TEXT PRIMARY KEY,
   pedido_id TEXT,
@@ -124,7 +139,6 @@ CREATE TABLE IF NOT EXISTS lv_sincronizacoes_lodja (
   tentativas INT DEFAULT 0
 );
 
--- RLS permissivo (ajuste em produção)
 ALTER TABLE lv_categorias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_subcategorias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_produtos ENABLE ROW LEVEL SECURITY;
@@ -134,6 +148,7 @@ ALTER TABLE lv_clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_pedido_itens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_promocoes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lv_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lv_sincronizacoes_lodja ENABLE ROW LEVEL SECURITY;
 
 DO $$
@@ -142,7 +157,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'lv_categorias','lv_subcategorias','lv_produtos','lv_variacoes',
     'lv_produto_imagens','lv_clientes','lv_pedidos','lv_pedido_itens',
-    'lv_promocoes','lv_sincronizacoes_lodja'
+    'lv_promocoes','lv_config','lv_sincronizacoes_lodja'
   ]
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "lv_all_%s" ON %I', t, t);

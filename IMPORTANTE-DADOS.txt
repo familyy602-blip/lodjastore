@@ -1,0 +1,32 @@
+PORQUE O DASHBOARD ESTÁ A ZERO
+================================
+
+A Loja Virtual usa o MESMO projecto Supabase do LODJA v1.
+
+MAS: os dados da loja (pedidos, produtos da loja) ficam em tabelas
+separadas com prefixo lv_  (lv_pedidos, lv_produtos, etc.)
+
+Se essas tabelas NÃO existirem, o sistema grava só no localStorage
+do browser. Isso NÃO é a base de dados Supabase.
+
+localStorage:
+- fica só NAQUELE browser e NAQUELE endereço (file:// ≠ github.io)
+- ao abrir no GitHub Pages, é outro "sítio" → dados a zero
+- limpar cache / outro PC / telemóvel → dados a zero
+
+LODJA v1 (clientes, compras, bónus):
+- continua no Supabase nas tabelas clientes, compras, etc.
+- isso NÃO apaga
+
+O QUE FAZER AGORA
+1. Supabase → SQL Editor
+2. Cole e execute o ficheiro: sql/schema-loja.sql
+3. Confirme que aparecem tabelas lv_pedidos, lv_produtos, ...
+4. Volte à loja (Ctrl+F5)
+5. Crie de novo produtos/pedidos — passam a gravar no Supabase
+
+RECUPERAR DADOS ANTIGOS DO LOCALSTORAGE
+Só é possível no MESMO browser onde os criou:
+- Abra a versão antiga (se ainda tiver o file:// no PC)
+- F12 → Application → Local Storage → copie chaves lv_pedidos, lv_produtos
+Ou volte a registar os pedidos manualmente.

@@ -434,7 +434,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Solicitar pedido — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/loja.css">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
 </head>
 <body>
   <div class="page-voltar">
@@ -442,7 +442,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   </div>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="logo" href="index.html"><img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%"> LODJA Store</a>
+      <a class="logo" href="index.html"><img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%"> LODJA Store</a>
     </div>
   </header>
   <main class="container" style="margin:24px auto 48px;max-width:640px">
@@ -479,10 +479,10 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     </div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-config.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/loja-storage.js"></script>
-  <script src="js/lodja-bridge.js"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/cart.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/lodja-bridge.js"></script>
   <script>
     (async () => {
       initSupabase(); await LojaDB.init();

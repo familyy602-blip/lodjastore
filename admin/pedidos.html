@@ -434,8 +434,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pedidos — Admin Loja</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/loja.css">
-  <link rel="icon" href="../logo-lodja.png">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     .ped-toolbar {
@@ -495,10 +495,10 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase-config.js"></script>
-  <script src="../js/admin-auth.js"></script>
-  <script src="../js/loja-storage.js"></script>
-  <script src="../js/lodja-bridge.js"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/lodja-bridge.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
     const ESTADOS = ['pendente','em_analise','confirmado','aguardando_pagamento','pago','em_preparacao','pronto','em_entrega','entregue','concluido','cancelado'];

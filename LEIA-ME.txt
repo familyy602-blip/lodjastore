@@ -1,0 +1,14 @@
+ATENÇÃO
+=======
+O ficheiro index.html DESTA pasta é a LOJA (página pública).
+
+NÃO use o ficheiro admin/index.html como index da raiz.
+admin/index.html é só o painel (Dashboard) e deve ficar DENTRO da pasta admin/.
+
+No GitHub, na RAIZ:
+  index.html     <- este daqui (LOJA)
+  admin/
+    index.html   <- Dashboard (só depois do login)
+
+Se o site abrir o Dashboard sem login, apague o index.html da raiz no GitHub
+e volte a enviar o index.html desta pasta (DEPLOY-LODJASTORE).

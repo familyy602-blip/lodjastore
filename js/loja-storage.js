@@ -145,9 +145,181 @@ const LojaDB = {
   },
 
   async _seedRemoteIfEmpty() {
-    const { data } = await window.supabaseClient.from('lv_produtos').select('id').limit(1);
-    if (data && data.length) return;
-    // optional: could push seed — skip for safety
+    try {
+      const db = window.supabaseClient;
+      if (!db) return;
+
+      // 1) Migrar dados do localStorage (se existirem) para o Supabase
+      await this._migrateLocalToRemote();
+
+      // 2) Se ainda não houver produtos, criar catálogo de exemplo
+      const { data: prods } = await db.from('lv_produtos').select('id').limit(1);
+      if (prods && prods.length) return;
+
+      // Força catálogo de exemplo se não houver nada local
+      if (!this._getLocal('lv_produtos').length) {
+        localStorage.removeItem('lv_seeded');
+      }
+      this._ensureSeed(); // garante seed no local
+      const cats = this._getLocal('lv_categorias');
+      const subs = this._getLocal('lv_subcategorias');
+      const produtos = this._getLocal('lv_produtos');
+
+      if (cats.length) await db.from('lv_categorias').upsert(cats);
+      if (subs.length) await db.from('lv_subcategorias').upsert(subs);
+
+      for (const prod of produtos) {
+        const row = {
+          id: prod.id,
+          codigo: prod.codigo || null,
+          nome: prod.nome,
+          descricao: prod.descricao || null,
+          categoria_id: prod.categoria_id || null,
+          subcategoria_id: prod.subcategoria_id || null,
+          preco: prod.preco || 0,
+          preco_promocional: prod.preco_promocional != null ? prod.preco_promocional : null,
+          estado: prod.estado || 'activo',
+          destaque: !!prod.destaque,
+          tendencia: !!prod.tendencia,
+          data_criacao: prod.data_criacao || new Date().toISOString()
+        };
+        await db.from('lv_produtos').upsert(row);
+        const imgs = (prod.imagens || []).map((im, i) => ({
+          id: im.id || this.genId('img_'),
+          produto_id: prod.id,
+          url: im.url || im,
+          ordem: im.ordem != null ? im.ordem : i,
+          tipo: im.tipo || (i === 0 ? 'principal' : 'secundaria')
+        }));
+        if (imgs.length) await db.from('lv_produto_imagens').upsert(imgs);
+        const vars = (prod.variacoes || []).map(v => ({
+          id: v.id || this.genId('var_'),
+          produto_id: prod.id,
+          tamanho: v.tamanho || null,
+          cor: v.cor || null,
+          codigo: v.codigo || null,
+          stock: v.stock != null ? v.stock : 0
+        }));
+        if (vars.length) await db.from('lv_variacoes').upsert(vars);
+      }
+      console.info('LojaDB: catálogo de exemplo gravado no Supabase');
+    } catch (e) {
+      console.warn('LojaDB seed remoto', e);
+    }
+  },
+
+  async _migrateLocalToRemote() {
+    try {
+      const db = window.supabaseClient;
+      if (!db) return;
+      if (localStorage.getItem('lv_migrated_to_supabase') === '1') return;
+
+      const cats = this._getLocal('lv_categorias');
+      const subs = this._getLocal('lv_subcategorias');
+      const produtos = this._getLocal('lv_produtos');
+      const pedidos = this._getLocal('lv_pedidos');
+
+      const hasLocal = cats.length || produtos.length || pedidos.length;
+      if (!hasLocal) return;
+
+      if (cats.length) {
+        await db.from('lv_categorias').upsert(cats.map(c => ({
+          id: c.id, nome: c.nome, descricao: c.descricao || null,
+          imagem: c.imagem || null, estado: c.estado || 'activo', ordem: c.ordem || 0
+        })));
+      }
+      if (subs.length) {
+        await db.from('lv_subcategorias').upsert(subs.map(s => ({
+          id: s.id, categoria_id: s.categoria_id, nome: s.nome,
+          descricao: s.descricao || null, estado: s.estado || 'activo'
+        })));
+      }
+
+      for (const prod of produtos) {
+        await db.from('lv_produtos').upsert({
+          id: prod.id,
+          codigo: prod.codigo || null,
+          nome: prod.nome,
+          descricao: prod.descricao || null,
+          categoria_id: prod.categoria_id || null,
+          subcategoria_id: prod.subcategoria_id || null,
+          preco: Number(prod.preco) || 0,
+          preco_promocional: prod.preco_promocional != null ? Number(prod.preco_promocional) : null,
+          estado: prod.estado || 'activo',
+          destaque: !!prod.destaque,
+          tendencia: !!prod.tendencia,
+          data_criacao: prod.data_criacao || new Date().toISOString()
+        });
+        const imgs = (prod.imagens || []).map((im, i) => ({
+          id: (im && im.id) || this.genId('img_'),
+          produto_id: prod.id,
+          url: typeof im === 'string' ? im : (im.url || ''),
+          ordem: (im && im.ordem != null) ? im.ordem : i,
+          tipo: (im && im.tipo) || (i === 0 ? 'principal' : 'secundaria')
+        })).filter(x => x.url);
+        if (imgs.length) await db.from('lv_produto_imagens').upsert(imgs);
+        const vars = (prod.variacoes || []).map(v => ({
+          id: v.id || this.genId('var_'),
+          produto_id: prod.id,
+          tamanho: v.tamanho || null,
+          cor: v.cor || null,
+          codigo: v.codigo || null,
+          stock: v.stock != null ? v.stock : 0
+        }));
+        if (vars.length) await db.from('lv_variacoes').upsert(vars);
+      }
+
+      for (const ped of pedidos) {
+        const { itens, ...rest } = ped;
+        await db.from('lv_pedidos').upsert({
+          id: rest.id,
+          numero_pedido: rest.numero_pedido,
+          cliente_id: rest.cliente_id || null,
+          cliente_nome: rest.cliente_nome || null,
+          cliente_telefone: rest.cliente_telefone || null,
+          cliente_email: rest.cliente_email || null,
+          subtotal: Number(rest.subtotal) || 0,
+          desconto: Number(rest.desconto) || 0,
+          taxa_entrega: Number(rest.taxa_entrega) || 0,
+          total: Number(rest.total) || 0,
+          estado: rest.estado || 'pendente',
+          metodo_pagamento: rest.metodo_pagamento || null,
+          metodo_entrega: rest.metodo_entrega || null,
+          morada_entrega: rest.morada_entrega || null,
+          observacoes: rest.observacoes || null,
+          lodja_cliente: !!rest.lodja_cliente,
+          lodja_sync: !!rest.lodja_sync,
+          data_criacao: rest.data_criacao || new Date().toISOString(),
+          data_confirmacao: rest.data_confirmacao || null,
+          data_conclusao: rest.data_conclusao || null
+        });
+        if (itens && itens.length) {
+          const rows = itens.map((it, i) => ({
+            id: it.id || this.genId('pi_'),
+            pedido_id: rest.id,
+            produto_id: it.produto_id || null,
+            variacao_id: it.variacao_id || null,
+            nome_produto: it.nome_produto || it.nome || null,
+            nome: it.nome || it.nome_produto || null,
+            tamanho: it.tamanho || null,
+            cor: it.cor || null,
+            quantidade: Number(it.quantidade) || 1,
+            preco_unitario: Number(it.preco_unitario || it.preco) || 0,
+            preco: Number(it.preco || it.preco_unitario) || 0,
+            desconto: Number(it.desconto) || 0,
+            subtotal: Number(it.subtotal) || 0
+          }));
+          await db.from('lv_pedido_itens').upsert(rows);
+        }
+      }
+
+      localStorage.setItem('lv_migrated_to_supabase', '1');
+      console.info('LojaDB: dados locais migrados para Supabase', {
+        cats: cats.length, produtos: produtos.length, pedidos: pedidos.length
+      });
+    } catch (e) {
+      console.warn('Migração local→Supabase', e);
+    }
   },
 
   _getLocal(key) {

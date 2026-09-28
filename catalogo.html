@@ -434,8 +434,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Catálogo — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/loja.css">
-  <link rel="icon" href="logo-lodja.png">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
 </head>
 <body>
   <div class="page-voltar">
@@ -444,7 +444,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <header class="site-header">
     <div class="container header-inner">
       <a class="logo" href="index.html">
-        <img src="logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" onerror="this.style.display='none'">
+        <img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" onerror="this.style.display='none'">
         <span id="brandName">LODJA Store</span>
       </a>
       <nav class="nav-links">
@@ -464,9 +464,9 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     <div class="grid-produtos" id="grid"></div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-config.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/loja-storage.js"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/cart.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     let todos = [], catActiva = '';
     function cardHTML(p) {

@@ -434,8 +434,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Admin — Login</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/loja.css">
-  <link rel="icon" href="../logo-lodja.png">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
   <style>
     .pass-wrap { position: relative; }
     .pass-wrap input { padding-right: 44px; }
@@ -449,12 +449,12 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
 </head>
 <body style="min-height:100vh;background:linear-gradient(160deg,#eef2ff,#f8fafc)">
   <div style="padding:16px">
-    <a class="btn-voltar" href="../index.html">← Voltar</a>
+    <a class="btn-voltar" href="/lodjastore/index.html">← Voltar</a>
   </div>
   <div style="display:grid;place-items:center;padding:24px">
     <form class="summary" style="width:min(380px,92vw)" id="form">
       <div style="text-align:center;margin-bottom:16px">
-        <img src="../logo-lodja.png" alt="" width="64" height="64" style="border-radius:50%;margin:0 auto 10px;display:block" onerror="this.style.display='none'">
+        <img src="/lodjastore/logo-lodja.png" alt="" width="64" height="64" style="border-radius:50%;margin:0 auto 10px;display:block" onerror="this.style.display='none'">
         <h1 style="font-size:1.25rem;margin:0">Painel administrativo</h1>
         <p style="color:var(--muted);font-size:14px;margin-top:4px" id="siteLabel">LODJA Store</p>
       </div>
@@ -469,9 +469,9 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     </form>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/supabase-config.js"></script>
-  <script src="../js/loja-storage.js"></script>
-  <script src="../js/admin-auth.js"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
   <script>
     document.getElementById('togglePass').onclick = () => {
       const inp = document.getElementById('pass');
