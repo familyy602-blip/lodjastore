@@ -357,6 +357,25 @@ const LojaDB = {
       const { data, error } = await window.supabaseClient.from('lv_produtos').select('*').order('data_criacao', { ascending: false });
       if (error) list = this._getLocal('lv_produtos');
       else list = data || [];
+      // Anexar imagens da tabela lv_produto_imagens (para o catálogo)
+      try {
+        const ids = (list || []).map(p => p.id).filter(Boolean);
+        if (ids.length) {
+          const { data: imgs } = await window.supabaseClient
+            .from('lv_produto_imagens')
+            .select('*')
+            .in('produto_id', ids)
+            .order('ordem');
+          const byProd = {};
+          (imgs || []).forEach(im => {
+            if (!byProd[im.produto_id]) byProd[im.produto_id] = [];
+            byProd[im.produto_id].push(im);
+          });
+          list = list.map(p => ({ ...p, imagens: byProd[p.id] || p.imagens || [] }));
+        }
+      } catch (e) {
+        console.warn('imagens produtos', e);
+      }
     }
     list = list.filter(p => p.estado !== 'oculto' && p.estado !== 'inactivo');
     if (filtros.categoria_id) list = list.filter(p => p.categoria_id === filtros.categoria_id);
@@ -715,8 +734,13 @@ const LojaDB = {
   imgPrincipal(p) {
     if (p.imagens && p.imagens.length) {
       const main = p.imagens.find(i => i.tipo === 'principal') || p.imagens[0];
-      return main.url;
+      const url = typeof main === 'string' ? main : (main && main.url);
+      if (url) return url;
     }
-    return 'logo-lodja.png';
+    if (p.imagem) return p.imagem;
+    if (p.imagem_url) return p.imagem_url;
+    const base = (typeof location !== 'undefined' && location.pathname.indexOf('/lodjastore') === 0)
+      ? '/lodjastore/' : '';
+    return base + 'logo-lodja.png';
   }
 };
