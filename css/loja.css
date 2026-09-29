@@ -767,7 +767,18 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   }
 
   /* Ocultar chips de categoria desktop no mobile se existir cat-scroll */
-  #chipsCats { display: none; }
+  #chipsCats {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 0 12px;
+    scrollbar-width: none;
+  }
+  #chipsCats::-webkit-scrollbar { display: none; }
+  #chipsCats .chip { flex: 0 0 auto; white-space: nowrap; }
+
 }
 
 @media (min-width: 901px) {

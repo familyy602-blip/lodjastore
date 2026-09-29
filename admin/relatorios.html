@@ -18,7 +18,9 @@
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
         <div><strong>Relatórios</strong><small>Admin LODJA</small></div>
       </div>
-      <div class="adm-top-actions"><a class="adm-icon-btn" href="index.html">🏠</a></div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
+        <a class="adm-icon-btn" href="index.html">🏠</a></div>
     </div>
   </header>
   <div class="adm-drawer" id="drawer">
@@ -29,6 +31,7 @@
       <a href="categorias.html">📂 Categorias</a>
       <a href="pedidos.html">📦 Pedidos</a>
       <a href="relatorios.html" class="active">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
       <a href="promocoes.html">🏷️ Promoções</a>
       <a href="configuracoes.html">⚙️ Configurações</a>
       <a href="/lodjastore/index.html">🏠 Ver loja</a>
@@ -426,7 +429,23 @@
         <table><thead><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th></tr></thead>
         <tbody>${pedidos.slice(0,50).map(p=>`<tr><td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td>
           <td>${p.total||0}</td><td>${esc(p.estado)}</td></tr>`).join('')}</tbody></table>
-        </body></html>`;
+        <script>
+    async function __refreshNtfBadge(){
+      try {
+        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (!b) return;
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+        else b.style.display = 'none';
+      } catch(e){}
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(__refreshNtfBadge, 600);
+      setInterval(__refreshNtfBadge, 30000);
+    });
+</script>
+</body></html>`;
     }
     function exportPDF() {
       const w = window.open('', '_blank');

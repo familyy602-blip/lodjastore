@@ -8,6 +8,23 @@
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
   <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
+  <style>
+    .ntf-detail {
+      position: fixed; inset: 0; z-index: 90; display: none;
+      align-items: flex-end; justify-content: center;
+      background: rgba(15,23,42,.45);
+    }
+    .ntf-detail.open { display: flex; }
+    .ntf-detail .sheet {
+      background: #fff; width: min(480px, 100%);
+      border-radius: 20px 20px 0 0; padding: 20px 16px 28px;
+      max-height: 80vh; overflow-y: auto;
+    }
+    @media (min-width: 640px) {
+      .ntf-detail { align-items: center; }
+      .ntf-detail .sheet { border-radius: 20px; }
+    }
+  </style>
 </head>
 <body class="admin-pro">
   <header class="adm-top">
@@ -16,7 +33,10 @@
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
         <div><strong>Notificações</strong><small>Actividade do sistema</small></div>
       </div>
-      <div class="adm-top-actions"><a class="adm-icon-btn" href="index.html">🏠</a></div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
     </div>
   </header>
   <div class="adm-drawer" id="drawer">
@@ -40,57 +60,168 @@
       <div class="ico">🔔</div>
       <div>
         <h1>Notificações</h1>
-        <p>Pedidos, produtos e eventos importantes do sistema.</p>
+        <p>Pedidos, produtos e eventos importantes.</p>
       </div>
     </div>
+    <div class="adm-toolbar">
+      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Pesquisar…" oninput="render()"></div>
+      <select class="adm-select" id="fTipo" onchange="render()">
+        <option value="">Todos os tipos</option>
+        <option value="pedido">Pedidos</option>
+        <option value="produto">Produtos</option>
+        <option value="cliente">Clientes</option>
+        <option value="sistema">Sistema</option>
+        <option value="info">Info</option>
+      </select>
+      <select class="adm-select" id="fEstado" onchange="render()">
+        <option value="">Todas</option>
+        <option value="nao_lida">Não lidas</option>
+        <option value="lida">Lidas</option>
+      </select>
+    </div>
     <div class="adm-actions-row">
-      <button type="button" class="adm-btn adm-btn-ghost" onclick="marcarTodas()">✓ Marcar todas como lidas</button>
-      <button type="button" class="adm-btn adm-btn-ghost" onclick="load()">↻ Actualizar</button>
+      <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="load()">↻ Actualizar</button>
+      <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="marcarTodas()">✓ Marcar todas lidas</button>
+      <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" style="color:#dc2626" onclick="apagarLidas()">🗑 Apagar lidas</button>
     </div>
     <div class="adm-card" style="padding:0" id="lista"></div>
   </div>
+
+  <div class="ntf-detail" id="detail">
+    <div class="sheet" id="detailSheet" onclick="event.stopPropagation()"></div>
+  </div>
+
   <nav class="adm-bottom">
     <a href="index.html"><span class="ico">🏠</span>Início</a>
     <a href="pedidos.html"><span class="ico">📋</span>Pedidos</a>
     <a href="notificacoes.html" class="active"><span class="ico">🔔</span>Alertas</a>
     <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
   </nav>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/lodjastore/js/supabase-config.js"></script>
   <script src="/lodjastore/js/admin-auth.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
-    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
-    function esc(s){ return String(s||'').replace(/</g,'&lt;'); }
+    let todas = [];
     const iconTipo = { pedido: '📦', produto: '👕', cliente: '👤', sistema: '⚙️', info: 'ℹ️' };
 
-    async function marcarTodas() {
-      await LojaDB.marcarTodasNotificacoesLidas();
-      load();
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+    async function refreshBadge() {
+      try {
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (!b) return;
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+        else { b.style.display = 'none'; }
+      } catch (e) {}
     }
-    async function abrir(n) {
-      if (!n.lida) await LojaDB.marcarNotificacaoLida(n.id);
-      if (n.ref_tipo === 'pedido') location.href = 'pedidos.html';
-      else if (n.ref_tipo === 'produto') location.href = 'produtos.html';
-      else load();
-    }
-    async function load() {
-      const list = await LojaDB.getNotificacoes();
+
+    function render() {
+      const q = (document.getElementById('q').value || '').toLowerCase();
+      const tipo = document.getElementById('fTipo').value;
+      const est = document.getElementById('fEstado').value;
+      let list = todas.slice();
+      if (tipo) list = list.filter(n => n.tipo === tipo);
+      if (est === 'nao_lida') list = list.filter(n => !n.lida);
+      if (est === 'lida') list = list.filter(n => n.lida);
+      if (q) list = list.filter(n =>
+        (n.titulo || '').toLowerCase().includes(q) ||
+        (n.mensagem || '').toLowerCase().includes(q)
+      );
       document.getElementById('lista').innerHTML = list.map(n => `
-        <div class="ntf-item ${n.lida ? 'read' : 'unread'}" onclick='abrir(${JSON.stringify(n).replace(/'/g,"&#39;")})'>
+        <div class="ntf-item ${n.lida ? 'read' : 'unread'}" data-id="${n.id}">
           <div class="dot"></div>
-          <div style="flex:1;min-width:0">
+          <div style="flex:1;min-width:0" onclick='abrirDetalhe(${JSON.stringify(n).replace(/'/g,"&#39;")})'>
             <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <strong>${iconTipo[n.tipo]||'🔔'} ${esc(n.titulo)}</strong>
-              <span class="meta" style="font-size:11px;color:#94a3b8">${n.data_criacao ? new Date(n.data_criacao).toLocaleString('pt-PT') : ''}</span>
+              <span style="font-size:11px;color:#94a3b8">${n.data_criacao ? new Date(n.data_criacao).toLocaleString('pt-PT') : ''}</span>
             </div>
             <div style="font-size:13px;color:#64748b;margin-top:4px">${esc(n.mensagem)}</div>
           </div>
+          <button type="button" class="adm-btn adm-btn-sm adm-btn-del" title="Eliminar" onclick="event.stopPropagation();apagarUma('${n.id}')">🗑</button>
         </div>
-      `).join('') || '<p style="text-align:center;padding:32px;color:#64748b">Sem notificações ainda.<br>Quando houver novos pedidos, aparecem aqui.</p>';
+      `).join('') || '<p style="text-align:center;padding:32px;color:#64748b">Nenhuma notificação com estes filtros.</p>';
     }
-    (async () => { initSupabase(); await LojaDB.init(); load(); })();
+
+    async function abrirDetalhe(n) {
+      if (!n.lida) {
+        await LojaDB.marcarNotificacaoLida(n.id);
+        n.lida = true;
+        const i = todas.findIndex(x => x.id === n.id);
+        if (i >= 0) todas[i].lida = true;
+        await refreshBadge();
+        render();
+      }
+      const sheet = document.getElementById('detailSheet');
+      let acao = '';
+      if (n.ref_tipo === 'pedido') {
+        acao = `<a class="adm-btn adm-btn-primary" href="pedidos.html" style="width:100%;margin-top:12px">Ver pedidos →</a>`;
+      } else if (n.ref_tipo === 'produto') {
+        acao = `<a class="adm-btn adm-btn-primary" href="produtos.html" style="width:100%;margin-top:12px">Ver produtos →</a>`;
+      }
+      sheet.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <strong style="font-size:16px">${iconTipo[n.tipo]||'🔔'} Detalhe</strong>
+          <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="fecharDetalhe()">Fechar</button>
+        </div>
+        <h2 style="margin:0 0 8px;font-size:1.15rem">${esc(n.titulo)}</h2>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">${n.data_criacao ? new Date(n.data_criacao).toLocaleString('pt-PT') : ''} · ${esc(n.tipo||'info')}</div>
+        <p style="margin:0;line-height:1.5;color:#334155">${esc(n.mensagem)}</p>
+        ${acao}
+        <button type="button" class="adm-btn adm-btn-ghost" style="width:100%;margin-top:8px;color:#dc2626" onclick="apagarUma('${n.id}');fecharDetalhe()">Eliminar notificação</button>
+      `;
+      document.getElementById('detail').classList.add('open');
+      document.getElementById('detail').onclick = fecharDetalhe;
+    }
+    function fecharDetalhe(){ document.getElementById('detail').classList.remove('open'); }
+
+    async function apagarUma(id) {
+      if (!confirm('Eliminar esta notificação?')) return;
+      await LojaDB.deleteNotificacao(id);
+      todas = todas.filter(n => n.id !== id);
+      await refreshBadge();
+      render();
+    }
+    async function apagarLidas() {
+      const lidas = todas.filter(n => n.lida);
+      if (!lidas.length) return alert('Não há notificações lidas para apagar.');
+      if (!confirm('Apagar todas as notificações já lidas (' + lidas.length + ')?')) return;
+      await LojaDB.deleteNotificacoes(lidas.map(n => n.id));
+      await load();
+    }
+    async function marcarTodas() {
+      await LojaDB.marcarTodasNotificacoesLidas();
+      await load();
+    }
+    async function load() {
+      todas = await LojaDB.getNotificacoes();
+      render();
+      await refreshBadge();
+    }
+    (async () => {
+      initSupabase(); await LojaDB.init();
+      await load();
+    })();
   </script>
+<script>
+    async function __refreshNtfBadge(){
+      try {
+        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (!b) return;
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+        else b.style.display = 'none';
+      } catch(e){}
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(__refreshNtfBadge, 600);
+      setInterval(__refreshNtfBadge, 30000);
+    });
+</script>
 </body>
 </html>

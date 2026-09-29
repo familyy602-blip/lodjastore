@@ -21,6 +21,8 @@
         </div>
       </div>
       <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
+        
         <a class="adm-icon-btn" href="index.html">🏠</a>
         <button type="button" class="adm-icon-btn" onclick="if(confirm('Sair?'))AdminAuth.logout()">👤</button>
       </div>
@@ -330,7 +332,23 @@
         <h1>Pedidos</h1><p>${new Date().toLocaleString('pt-PT')}</p>
         <table><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Data</th></tr>
         ${list.map(p=>`<tr><td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td><td>${p.total}</td><td>${esc(p.estado)}</td><td>${esc(p.data_criacao)}</td></tr>`).join('')}
-        </table></body></html>`);
+        </table><script>
+    async function __refreshNtfBadge(){
+      try {
+        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (!b) return;
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+        else b.style.display = 'none';
+      } catch(e){}
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(__refreshNtfBadge, 600);
+      setInterval(__refreshNtfBadge, 30000);
+    });
+</script>
+</body></html>`);
       w.document.close(); setTimeout(()=>w.print(), 400);
     }
 

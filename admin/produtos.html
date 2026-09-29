@@ -235,7 +235,7 @@
       const fe = document.getElementById('fEstado').value;
       let list = todos.slice();
       if (q) list = list.filter(p => (p.nome || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q));
-      if (fc) list = list.filter(p => p.categoria_id === fc);
+      if (fc) list = list.filter(p => String(p.categoria_id||'') === String(fc));
       if (fe) list = list.filter(p => (p.estado || 'activo') === fe);
       const catName = id => { const c = cats.find(x => x.id === id); return c ? c.nome : '—'; };
       document.getElementById('lista').innerHTML = list.map(p => {
@@ -282,5 +282,21 @@
       } catch (e) {}
     })();
   </script>
+<script>
+    async function __refreshNtfBadge(){
+      try {
+        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (!b) return;
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+        else b.style.display = 'none';
+      } catch(e){}
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      setTimeout(__refreshNtfBadge, 600);
+      setInterval(__refreshNtfBadge, 30000);
+    });
+</script>
 </body>
 </html>

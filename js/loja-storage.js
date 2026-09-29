@@ -931,6 +931,22 @@ const LojaDB = {
     }
   },
 
+  async deleteNotificacao(id) {
+    if (this._local) {
+      this._setLocal('lv_notificacoes', this._getLocal('lv_notificacoes').filter(n => n.id !== id));
+      return;
+    }
+    try {
+      await window.supabaseClient.from('lv_notificacoes').delete().eq('id', id);
+    } catch (e) {
+      this._setLocal('lv_notificacoes', this._getLocal('lv_notificacoes').filter(n => n.id !== id));
+    }
+  },
+
+  async deleteNotificacoes(ids) {
+    for (const id of (ids || [])) await this.deleteNotificacao(id);
+  },
+
   async marcarTodasNotificacoesLidas() {
     if (this._local) {
       const list = this._getLocal('lv_notificacoes').map(n => ({ ...n, lida: true }));

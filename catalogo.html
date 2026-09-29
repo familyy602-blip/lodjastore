@@ -516,13 +516,25 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       } catch(e){}
       todos = await LojaDB.getProdutos({});
       const cats = await LojaDB.getCategorias();
+      const params = new URLSearchParams(location.search);
+      const catParam = params.get('cat') || '';
+      catActiva = catParam;
       document.getElementById('chipsCats').innerHTML =
-        `<button type="button" class="chip active" data-id="">Todos</button>` +
-        cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
-      document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-        ch.classList.add('active'); catActiva = ch.dataset.id; filtrar();
-      }));
+        `<button type="button" class="chip ${!catParam?'active':''}" data-id="">Todos</button>` +
+        cats.map(c => `<button type="button" class="chip ${catParam===c.id?'active':''}" data-id="${c.id}">${(c.icone||'')+' '+(c.nome||'')}</button>`).join('');
+      document.querySelectorAll('.chip').forEach(ch => {
+        ch.addEventListener('click', () => {
+          document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+          ch.classList.add('active');
+          catActiva = ch.dataset.id || '';
+          try {
+            const u = new URL(location.href);
+            if (catActiva) u.searchParams.set('cat', catActiva); else u.searchParams.delete('cat');
+            history.replaceState(null, '', u.pathname + u.search);
+          } catch (e) {}
+          filtrar();
+        });
+      });
       filtrar();
     })();
   </script>
