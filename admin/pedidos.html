@@ -1,133 +1,498 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+  <!-- CSS embutido: funciona no GitHub Pages mesmo se css/ falhar -->
+  <style id="loja-css-inline">
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --accent: #f59e0b;
+  --success: #10b981;
+  --danger: #ef4444;
+  --border: #e2e8f0;
+  --radius: 14px;
+  --shadow: 0 8px 24px rgba(15, 23, 42, .08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button, input, select, textarea { font: inherit; }
+
+.container { width: min(1120px, 100% - 32px); margin: 0 auto; }
+
+/* Header */
+.site-header {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.header-inner {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 0; justify-content: space-between;
+}
+.logo {
+  display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.15rem;
+}
+.logo-mark {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; display: grid; place-items: center; font-weight: 800;
+}
+.nav-links { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.nav-links a, .nav-links button {
+  padding: 8px 12px; border-radius: 10px; border: none; background: transparent;
+  color: var(--muted); font-weight: 600; cursor: pointer;
+}
+.nav-links a:hover, .nav-links a.active { background: #eef2ff; color: var(--primary); }
+.icon-btn {
+  position: relative; width: 42px; height: 42px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  display: grid; place-items: center; cursor: pointer;
+}
+.badge-count {
+  position: absolute; top: -4px; right: -4px;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+  min-width: 18px; height: 18px; border-radius: 99px; display: grid; place-items: center;
+  padding: 0 4px;
+}
+
+/* Hero */
+.hero {
+  margin: 20px 0 28px;
+  background: linear-gradient(135deg, #eef2ff 0%, #fdf4ff 50%, #fff7ed 100%);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 28px 24px;
+  display: grid; gap: 12px;
+}
+.hero h1 { font-size: clamp(1.5rem, 4vw, 2.1rem); line-height: 1.2; }
+.hero p { color: var(--muted); max-width: 520px; }
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 18px; border-radius: 12px; border: none; font-weight: 700;
+  cursor: pointer; transition: .15s ease;
+}
+.btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+.btn-primary:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.btn-outline { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-accent { background: var(--accent); color: #111; }
+.btn-sm { padding: 8px 12px; font-size: 13px; border-radius: 10px; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Sections */
+.section { margin: 28px 0; }
+.section-head {
+  display: flex; justify-content: space-between; align-items: end; gap: 12px;
+  margin-bottom: 14px;
+}
+.section-head h2 { font-size: 1.25rem; }
+.section-head span { color: var(--muted); font-size: 14px; }
+
+/* Product grid */
+.grid-produtos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+@media (min-width: 640px) {
+  .grid-produtos { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+.card-prod {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  transition: transform .15s ease;
+}
+.card-prod:hover { transform: translateY(-3px); }
+.card-prod .thumb {
+  aspect-ratio: 4/5; background: #f1f5f9; position: relative; overflow: hidden;
+}
+.card-prod .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.badge-promo {
+  position: absolute; top: 10px; left: 10px;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 800;
+  padding: 4px 8px; border-radius: 8px;
+}
+.card-body { padding: 12px; }
+.card-body h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }
+.preco { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.preco .now { font-weight: 800; color: var(--primary-dark); }
+.preco .old { text-decoration: line-through; color: var(--muted); font-size: 13px; }
+
+/* Chips categorias */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 18px; }
+.chip {
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.chip.active, .chip:hover { background: #eef2ff; border-color: #c7d2fe; color: var(--primary); }
+
+/* Promo timer */
+.promo-banner {
+  background: #0f172a; color: #fff; border-radius: 16px; padding: 16px 18px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.promo-banner .timer {
+  display: flex; gap: 8px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.promo-banner .timer span {
+  background: rgba(255,255,255,.12); padding: 8px 10px; border-radius: 10px; min-width: 52px; text-align: center;
+}
+
+/* Product page */
+.prod-layout {
+  display: grid; gap: 24px; margin: 20px 0 40px;
+}
+@media (min-width: 800px) {
+  .prod-layout { grid-template-columns: 1.1fr 1fr; align-items: start; }
+}
+.gallery { display: grid; gap: 10px; }
+.gallery-main {
+  aspect-ratio: 4/5; border-radius: 18px; overflow: hidden; background: #f1f5f9; border: 1px solid var(--border);
+}
+.gallery-main img { width: 100%; height: 100%; object-fit: cover; }
+.gallery-thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.gallery-thumbs button {
+  width: 64px; height: 64px; border-radius: 12px; overflow: hidden; border: 2px solid transparent;
+  padding: 0; cursor: pointer; background: #f1f5f9;
+}
+.gallery-thumbs button.active { border-color: var(--primary); }
+.gallery-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+.opts { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 14px; }
+.opt {
+  min-width: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; font-weight: 600;
+}
+.opt.selected { border-color: var(--primary); background: #eef2ff; color: var(--primary); }
+.qty-row { display: flex; align-items: center; gap: 10px; margin: 12px 0 18px; }
+.qty-row button {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: #fff; font-size: 18px; cursor: pointer;
+}
+.qty-row span { min-width: 28px; text-align: center; font-weight: 700; }
+.actions-row { display: grid; gap: 10px; }
+
+/* Cart / checkout */
+.table-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+}
+.cart-item {
+  display: grid; grid-template-columns: 72px 1fr auto; gap: 12px; padding: 14px;
+  border-bottom: 1px solid var(--border); align-items: center;
+}
+.cart-item img { width: 72px; height: 90px; object-fit: cover; border-radius: 10px; background: #f1f5f9; }
+.cart-item .meta { color: var(--muted); font-size: 13px; }
+.summary {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+  position: sticky; top: 80px;
+}
+.summary .line { display: flex; justify-content: space-between; margin: 8px 0; color: var(--muted); }
+.summary .total { font-size: 1.2rem; font-weight: 800; color: var(--text); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.form-control {
+  width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+  background: #fff;
+}
+.form-control:focus { outline: none; border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,.2); }
+
+/* Footer */
+.site-footer {
+  margin-top: 48px; padding: 28px 0; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px;
+}
+.footer-inner { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+
+/* Admin */
+.admin-layout { display: grid; min-height: 100vh; }
+@media (min-width: 900px) {
+  .admin-layout { grid-template-columns: 240px 1fr; }
+}
+.admin-side {
+  background: #0f172a; color: #e2e8f0; padding: 20px 14px;
+}
+.admin-side a {
+  display: block; padding: 10px 12px; border-radius: 10px; color: #94a3b8; font-weight: 600; margin-bottom: 4px;
+}
+.admin-side a:hover, .admin-side a.active { background: rgba(99,102,241,.25); color: #fff; }
+.admin-main { padding: 20px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin: 16px 0; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+}
+.stat .l { font-size: 12px; color: var(--muted); }
+.stat .v { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.data th, table.data td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
+.badge-estado {
+  display: inline-block; padding: 4px 8px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  background: #e2e8f0;
+}
+.badge-estado.pendente { background: #fef3c7; color: #92400e; }
+.badge-estado.confirmado, .badge-estado.pago { background: #dbeafe; color: #1e40af; }
+.badge-estado.concluido, .badge-estado.entregue { background: #d1fae5; color: #065f46; }
+.badge-estado.cancelado { background: #fee2e2; color: #991b1b; }
+
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #0f172a; color: #fff; padding: 12px 18px; border-radius: 12px;
+  z-index: 100; font-weight: 600; box-shadow: var(--shadow);
+}
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+
+
+/* Incremental: botão Voltar e admin focado */
+.btn-voltar {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #64748b, #475569);
+  color: #fff !important; border: none; font-weight: 700;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none;
+  box-shadow: 0 2px 8px rgba(15,23,42,.12);
+}
+.btn-voltar:hover { filter: brightness(1.08); color: #fff !important; }
+.btn-orange {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff !important; border: none; font-weight: 700;
+  padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none;
+}
+.btn-orange:hover { filter: brightness(1.06); color: #fff !important; }
+.catalogo-search {
+  width: 100%; max-width: 100%; margin: 0 0 12px;
+}
+.catalogo-toolbar {
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;
+}
+@media (min-width: 640px) {
+  .catalogo-toolbar { flex-direction: row; align-items: center; justify-content: space-between; }
+  .catalogo-search { max-width: 280px; }
+}
+.admin-topbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.admin-topbar h1 { margin: 0; font-size: 1.25rem; flex: 1; min-width: 120px; }
+.admin-page .admin-side { display: none !important; }
+.admin-page .admin-layout { display: block; }
+.admin-page .admin-main { max-width: 960px; margin: 0 auto; padding: 16px; width: 100%; }
+.bonus-destaque {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff;
+  border-radius: 16px; padding: 16px; margin: 12px 0 18px;
+}
+.bonus-destaque .btn { background: #fff; color: #4f46e5; font-weight: 700; }
+@media (max-width: 640px) {
+  .admin-main { padding: 12px !important; }
+  table.data { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+.upload-zone {
+  border: 2px dashed #c7d2fe; border-radius: 14px; padding: 14px; text-align: center;
+  background: #f8fafc; cursor: pointer; color: var(--muted); font-size: 14px;
+}
+.upload-zone:hover { border-color: var(--primary); color: var(--primary); }
+.img-upload-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.img-upload-item {
+  position: relative; width: 88px; height: 88px; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border); background: #f1f5f9;
+}
+.img-upload-item img { width: 100%; height: 100%; object-fit: cover; }
+.img-upload-item button {
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: none;
+  border-radius: 50%; background: rgba(15,23,42,.75); color: #fff; cursor: pointer;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+
+
+/* Voltar sempre visível e sólido */
+.btn-voltar {
+  background: linear-gradient(135deg, #64748b, #475569) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  border: none !important;
+  text-decoration: none !important;
+}
+.nav-links .btn-voltar {
+  display: inline-flex !important;
+  padding: 8px 14px !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+.admin-topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(255,255,255,.97);
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.admin-topbar h1 {
+  margin: 0; font-size: 1.2rem; flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-main .summary,
+.admin-main form.summary {
+  max-width: min(560px, 100%) !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 600px) {
+  .admin-main { padding: 12px !important; }
+  .admin-topbar { margin-left: 0; margin-right: 0; }
+  .form-control, select.form-control, textarea.form-control { font-size: 16px; }
+}
+
+
+/* Voltar no canto superior esquerdo (igual ao login admin) */
+.page-voltar {
+  padding: 16px;
+  margin: 0;
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.page-voltar .btn-voltar {
+  display: inline-flex !important;
+  background: linear-gradient(135deg, #64748b, #475569) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+.admin-page .admin-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 12px 16px 40px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.admin-page-title {
+  margin: 8px 0 16px;
+  font-size: 1.35rem;
+}
+.admin-form-card {
+  width: 100% !important;
+  max-width: 640px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+.admin-page .admin-layout {
+  display: block;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .page-voltar { padding: 12px 12px 0; }
+  .admin-page .admin-main { padding: 8px 12px 32px; }
+  .admin-form-card { max-width: 100% !important; }
+}
+
+.admin-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.admin-centered .admin-page-title {
+  text-align: left;
+  width: 100%;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.admin-centered .summary,
+.admin-centered .admin-form-card,
+.admin-centered .table-card {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 640px;
+  box-sizing: border-box;
+}
+.admin-centered .table-card {
+  max-width: 960px;
+}
+
+  </style>
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Pedidos — Admin LODJA</title>
+  <title>Pedidos — Admin Loja</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
-  <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .ped-toolbar {
+      max-width: 720px; margin: 0 auto 16px; width: 100%;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+    }
+    .ped-list { max-width: 720px; margin: 0 auto; width: 100%; }
+    .ped-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 12px;
+      box-shadow: 0 4px 14px rgba(15,23,42,.05);
+    }
+    .ped-head {
+      display: flex; flex-wrap: wrap; gap: 8px 12px;
+      justify-content: space-between; align-items: flex-start;
+    }
+    .ped-actions {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px;
+    }
+    .ped-actions select.form-control { max-width: 180px; min-width: 140px; }
+    .ped-meta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .ped-itens { font-size: 13px; margin: 10px 0; line-height: 1.45; }
+    .admin-page-title { text-align: center; max-width: 720px; margin-left: auto; margin-right: auto; }
+    .ped-hint {
+      text-align: center; color: var(--muted); font-size: 13px;
+      max-width: 720px; margin: -6px auto 16px;
+    }
+    @media (max-width: 600px) {
+      .ped-actions select.form-control { max-width: 100%; width: 100%; }
+      .ped-card { padding: 12px; }
+    }
+  </style>
 </head>
-<body class="admin-pro">
-  <header class="adm-top">
-    <div class="adm-top-row">
-      <div class="adm-brand">
-        <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
-        <div>
-          <strong>Pedidos</strong>
-          <small>Admin · Gestão de Encomendas</small>
-        </div>
-      </div>
-      <div class="adm-top-actions">
-        <a class="adm-icon-btn" href="index.html">🏠</a>
-        <button type="button" class="adm-icon-btn" onclick="if(confirm('Sair?'))AdminAuth.logout()">👤</button>
-      </div>
-    </div>
-  </header>
-
-  <div class="adm-drawer" id="drawer">
-    <div class="scrim" onclick="toggleMenu()"></div>
-    <div class="panel">
-      <div style="font-weight:800;padding:8px 12px 16px">LODJA Admin</div>
-      <a href="index.html">📊 Dashboard</a>
-      <a href="produtos.html">👕 Produtos</a>
-      <a href="categorias.html">📂 Categorias</a>
-      <a href="pedidos.html" class="active">📦 Pedidos</a>
-      <a href="relatorios.html">📈 Relatórios</a>
-      <a href="promocoes.html">🏷️ Promoções</a>
-      <a href="configuracoes.html">⚙️ Configurações</a>
-      <a href="/lodjastore/index.html">🏠 Ver loja</a>
-      <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
-    </div>
+<body class="admin-page">
+  <div class="page-voltar">
+    <a class="btn-voltar" href="index.html">← Voltar</a>
   </div>
 
-  <div class="adm-shell">
-    <a class="adm-back" href="index.html">← Voltar</a>
-    <div class="adm-page-head">
-      <div class="ico">📦</div>
-      <div>
-        <h1>Gestão de encomendas</h1>
-        <p>Filtre, acompanhe e sincronize pedidos com o LODJA.</p>
-      </div>
-    </div>
+  <div class="admin-layout">
+    <main class="admin-main">
+      <h1 class="admin-page-title">Pedidos</h1>
+      <p class="ped-hint">
+        Gestão de encomendas. Marque <strong>Cliente LODJA</strong> para registar no programa de bónus.
+        Estados <strong>pago / pronto / entregue / concluído</strong> criam a compra no LODJA com factura (001, 002…).
+      </p>
 
-    <div class="adm-toolbar">
-      <div class="adm-search">
-        <span>🔍</span>
-        <input id="filtro" placeholder="Pesquisar por nº, nome ou telefone…" oninput="render()">
+      <div class="ped-toolbar">
+        <input class="form-control" id="filtro" placeholder="Pesquisar nº, nome ou telefone…" style="flex:1;min-width:160px" oninput="render()">
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button class="btn btn-outline" type="button" onclick="exportExcel()">📥 Excel</button>
+          <button class="btn btn-outline" type="button" onclick="exportPDF()">📄 PDF</button>
+        </div>
       </div>
-      <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="toggleFilters()">🎛 Filtros</button>
-    </div>
 
-    <div class="filters-panel" id="filtersPanel" style="display:none">
-      <div class="filters-grid">
-        <div>
-          <label>Período</label>
-          <select id="fPeriodo" onchange="onPeriodo()">
-            <option value="todos">Todos</option>
-            <option value="hoje">Hoje</option>
-            <option value="ontem">Ontem</option>
-            <option value="7d">Últimos 7 dias</option>
-            <option value="30d">Últimos 30 dias</option>
-            <option value="mes">Este mês</option>
-            <option value="ano">Este ano</option>
-            <option value="custom">Personalizado</option>
-          </select>
-        </div>
-        <div>
-          <label>Estado</label>
-          <select id="fEstado" onchange="render()">
-            <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="pago">Pago</option>
-            <option value="pronto">Pronto</option>
-            <option value="entregue">Entregue</option>
-            <option value="concluido">Concluído</option>
-            <option value="cancelado">Cancelado</option>
-          </select>
-        </div>
-        <div>
-          <label>Ordenar</label>
-          <select id="fOrdem" onchange="render()">
-            <option value="desc">Mais recentes</option>
-            <option value="asc">Mais antigos</option>
-            <option value="valor_desc">Maior valor</option>
-            <option value="valor_asc">Menor valor</option>
-          </select>
-        </div>
-        <div>
-          <label>Hora (início)</label>
-          <input type="time" id="fHoraIni" onchange="render()">
-        </div>
-        <div id="customDates" style="display:none;grid-column:1/-1">
-          <div class="filters-grid">
-            <div><label>De (data)</label><input type="date" id="fDe" onchange="render()"></div>
-            <div><label>Até (data)</label><input type="date" id="fAte" onchange="render()"></div>
-          </div>
-        </div>
-        <div>
-          <label>Hora (fim)</label>
-          <input type="time" id="fHoraFim" onchange="render()">
-        </div>
-      </div>
-      <div class="adm-actions-row" style="margin-top:10px;margin-bottom:0">
-        <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="exportExcel()">📥 Excel</button>
-        <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="exportPDF()">📄 PDF</button>
-        <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="limparFiltros()">Limpar filtros</button>
-      </div>
-    </div>
-
-    <div id="lista"></div>
+      <div class="ped-list" id="lista"></div>
+    </main>
   </div>
-
-  <nav class="adm-bottom">
-    <a href="index.html"><span class="ico">🏠</span>Início</a>
-    <a href="pedidos.html" class="active"><span class="ico">📋</span>Pedidos</a>
-    <a href="produtos.html"><span class="ico">📦</span>Produtos</a>
-    <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
-  </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/lodjastore/js/supabase-config.js"></script>
@@ -140,108 +505,7 @@
     const SYNC_ESTADOS = ['pago','pronto','concluido','entregue'];
     let todos = [];
 
-    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
-    function toggleFilters(){
-      const p = document.getElementById('filtersPanel');
-      p.style.display = p.style.display === 'none' ? 'block' : 'none';
-    }
-    function onPeriodo(){
-      document.getElementById('customDates').style.display =
-        document.getElementById('fPeriodo').value === 'custom' ? 'block' : 'none';
-      render();
-    }
-    function limparFiltros(){
-      document.getElementById('filtro').value = '';
-      document.getElementById('fPeriodo').value = 'todos';
-      document.getElementById('fEstado').value = '';
-      document.getElementById('fOrdem').value = 'desc';
-      document.getElementById('fHoraIni').value = '';
-      document.getElementById('fHoraFim').value = '';
-      document.getElementById('fDe').value = '';
-      document.getElementById('fAte').value = '';
-      document.getElementById('customDates').style.display = 'none';
-      render();
-    }
     function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-    function badgeCls(est){
-      const e=(est||'').toLowerCase();
-      if(['pago','concluido','entregue','pronto'].includes(e)) return 'ok';
-      if(['pendente','em_analise','aguardando_pagamento'].includes(e)) return 'warn';
-      if(e==='cancelado') return 'muted';
-      return 'info';
-    }
-    function barCls(est){
-      const e=(est||'').toLowerCase();
-      if(['pago','concluido','entregue'].includes(e)) return '';
-      if(e==='pendente') return 'warn';
-      return 'muted';
-    }
-
-    function inPeriod(d, periodo){
-      if (!d || periodo === 'todos') return true;
-      const dt = new Date(d);
-      if (isNaN(dt)) return true;
-      const now = new Date();
-      const startOfDay = (x) => { const y = new Date(x); y.setHours(0,0,0,0); return y; };
-      const endOfDay = (x) => { const y = new Date(x); y.setHours(23,59,59,999); return y; };
-      if (periodo === 'hoje') return dt >= startOfDay(now) && dt <= endOfDay(now);
-      if (periodo === 'ontem') {
-        const y = new Date(now); y.setDate(y.getDate()-1);
-        return dt >= startOfDay(y) && dt <= endOfDay(y);
-      }
-      if (periodo === '7d') { const y = new Date(now); y.setDate(y.getDate()-7); return dt >= y; }
-      if (periodo === '30d') { const y = new Date(now); y.setDate(y.getDate()-30); return dt >= y; }
-      if (periodo === 'mes') return dt.getMonth()===now.getMonth() && dt.getFullYear()===now.getFullYear();
-      if (periodo === 'ano') return dt.getFullYear()===now.getFullYear();
-      if (periodo === 'custom') {
-        const de = document.getElementById('fDe').value;
-        const ate = document.getElementById('fAte').value;
-        if (de && dt < new Date(de+'T00:00:00')) return false;
-        if (ate && dt > new Date(ate+'T23:59:59')) return false;
-      }
-      return true;
-    }
-    function inHour(d){
-      const hi = document.getElementById('fHoraIni').value;
-      const hf = document.getElementById('fHoraFim').value;
-      if (!hi && !hf) return true;
-      if (!d) return true;
-      const dt = new Date(d);
-      const mins = dt.getHours()*60 + dt.getMinutes();
-      if (hi) {
-        const [h,m] = hi.split(':').map(Number);
-        if (mins < h*60+m) return false;
-      }
-      if (hf) {
-        const [h,m] = hf.split(':').map(Number);
-        if (mins > h*60+m) return false;
-      }
-      return true;
-    }
-
-    function filtered(){
-      const q = (document.getElementById('filtro').value||'').toLowerCase().trim();
-      const est = document.getElementById('fEstado').value;
-      const periodo = document.getElementById('fPeriodo').value;
-      const ordem = document.getElementById('fOrdem').value;
-      let list = todos.filter(p => {
-        if (q) {
-          const blob = [p.numero_pedido,p.cliente_nome,p.cliente_telefone].join(' ').toLowerCase();
-          if (!blob.includes(q)) return false;
-        }
-        if (est && p.estado !== est) return false;
-        if (!inPeriod(p.data_criacao, periodo)) return false;
-        if (!inHour(p.data_criacao)) return false;
-        return true;
-      });
-      list.sort((a,b) => {
-        if (ordem === 'asc') return new Date(a.data_criacao||0) - new Date(b.data_criacao||0);
-        if (ordem === 'valor_desc') return (Number(b.total)||0) - (Number(a.total)||0);
-        if (ordem === 'valor_asc') return (Number(a.total)||0) - (Number(b.total)||0);
-        return new Date(b.data_criacao||0) - new Date(a.data_criacao||0);
-      });
-      return list;
-    }
 
     async function tornarCliente(id, on) {
       if (on && !confirm('Registar este contacto como cliente no LODJA v1?')) { render(); return; }
@@ -249,8 +513,12 @@
         await LojaDB.marcarClienteLodja(id, on);
         if (on) alert('Cliente registado no LODJA v1.');
         await load();
-      } catch (e) { alert('Erro: '+(e.message||e)); render(); }
+      } catch (e) {
+        alert('Erro: ' + (e.message || e));
+        render();
+      }
     }
+
     async function mudar(id, estado) {
       try {
         const p = await LojaDB.actualizarEstadoPedido(id, estado);
@@ -259,82 +527,130 @@
           const r = await LodjaBridge.sincronizarCompra(p, { ...settings, syncComprasLodja: true, syncClientesLodja: true });
           if (r && r.ok) {
             alert(r.duplicado
-              ? 'Actualizado. Compra já existia no LODJA (factura '+(r.factura||'')+').'
-              : 'Actualizado.\nFactura LODJA '+(r.factura||'')+' · '+(r.pecas||'')+' peça(s).');
-          } else if (r && !r.skip) alert('Actualizado. LODJA: '+((r&&r.erro)||'não sincronizado'));
+              ? 'Pedido actualizado. Compra já existia no LODJA (factura ' + (r.factura || '') + ').'
+              : 'Pedido actualizado.\nCompra no LODJA · Factura ' + (r.factura || '') + ' · ' + (r.pecas || '') + ' peça(s).');
+          } else if (r && r.skip) {
+            alert('Pedido actualizado. Sync LODJA desligada nas configurações.');
+          } else {
+            alert('Pedido actualizado. LODJA: ' + ((r && r.erro) || 'não sincronizado'));
+          }
         }
         await load();
-      } catch (e) { alert('Erro: '+(e.message||e)); }
+      } catch (e) {
+        alert('Erro: ' + (e.message || e));
+      }
     }
+
     async function syncManual(id) {
       try {
         const p = await LojaDB.getPedido(id);
         if (!p) return alert('Pedido não encontrado');
         await LojaDB.marcarClienteLodja(id, true);
         const settings = await LojaDB.getSettings();
-        const r = await LodjaBridge.sincronizarCompra({ ...p, lodja_cliente: true }, { ...settings, syncComprasLodja: true, syncClientesLodja: true });
-        if (r && r.ok) alert(r.duplicado ? 'Já no LODJA (factura '+(r.factura||'')+').' : 'Sincronizado · Factura '+(r.factura||''));
-        else alert('Falha: '+((r&&r.erro)||'desconhecida'));
+        const r = await LodjaBridge.sincronizarCompra(
+          { ...p, lodja_cliente: true },
+          { ...settings, syncComprasLodja: true, syncClientesLodja: true }
+        );
+        if (r && r.ok) {
+          alert(r.duplicado
+            ? 'Já estava no LODJA (factura ' + (r.factura || '') + ').'
+            : 'Sincronizado · Factura LODJA ' + (r.factura || '') + ' · ' + (r.pecas || '') + ' peça(s).');
+        } else alert('Falha: ' + ((r && r.erro) || 'desconhecida'));
         await load();
-      } catch (e) { alert('Erro: '+(e.message||e)); }
+      } catch (e) {
+        alert('Erro: ' + (e.message || e));
+      }
     }
 
     function render() {
-      const list = filtered();
+      const q = (document.getElementById('filtro').value || '').toLowerCase().trim();
+      let list = todos;
+      if (q) {
+        list = list.filter(p =>
+          String(p.numero_pedido || '').toLowerCase().includes(q) ||
+          String(p.cliente_nome || '').toLowerCase().includes(q) ||
+          String(p.cliente_telefone || '').includes(q)
+        );
+      }
       document.getElementById('lista').innerHTML = list.map(p => {
-        const itens = (p.itens||[]).map(i => (i.quantidade||1)+'× '+esc(i.nome||i.nome_produto)).join(', ') || '—';
-        const syncOk = p.lodja_sync || localStorage.getItem('lv_sync_'+p.numero_pedido)==='ok';
-        const fact = localStorage.getItem('lv_sync_fact_'+p.numero_pedido)||'';
-        return `<article class="adm-card">
-          <div style="display:flex;gap:10px;align-items:flex-start">
-            <div class="bar ${barCls(p.estado)}" style="width:4px;min-height:48px;border-radius:4px;background:${barCls(p.estado)==='warn'?'#f59e0b':barCls(p.estado)==='muted'?'#94a3b8':'#22c55e'}"></div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
-                <strong style="font-size:15px">${esc(p.numero_pedido)}</strong>
-                <span class="adm-badge ${badgeCls(p.estado)}">${esc(p.estado)}</span>
-              </div>
-              <div class="meta" style="margin-top:4px">👤 ${esc(p.cliente_nome)} · 📞 ${esc(p.cliente_telefone)}</div>
-              <div class="meta">${p.data_criacao?new Date(p.data_criacao).toLocaleString('pt-PT'):'—'} · <strong>${LojaDB.formatMT(p.total)}</strong></div>
-              <div style="font-size:12px;margin-top:6px;color:var(--adm-muted)">${itens}</div>
-              <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-                <label style="font-size:12px;display:inline-flex;gap:6px;align-items:center">
-                  <input type="checkbox" ${p.lodja_cliente?'checked':''} onchange="tornarCliente('${p.id}', this.checked)"> Cliente LODJA
-                </label>
-                <span class="meta">${syncOk?'✓ LODJA'+(fact?' · Fact. '+fact:''):'○ Sem compra LODJA'}</span>
-              </div>
-              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
-                <select class="adm-select" style="flex:1;min-width:140px" onchange="mudar('${p.id}', this.value)">
-                  ${ESTADOS.map(e=>`<option value="${e}" ${e===p.estado?'selected':''}>${e}</option>`).join('')}
-                </select>
-                <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="syncManual('${p.id}')">↗ LODJA</button>
-              </div>
+        const itens = (p.itens || []).map(i =>
+          (i.quantidade || 1) + '× ' + esc(i.nome) +
+          (i.tamanho || i.cor ? ' <span style="color:var(--muted)">(' + [i.tamanho, i.cor].filter(Boolean).join('/') + ')</span>' : '')
+        ).join('<br>') || '—';
+        const syncOk = p.lodja_sync || localStorage.getItem('lv_sync_' + p.numero_pedido) === 'ok';
+        const fact = localStorage.getItem('lv_sync_fact_' + p.numero_pedido) || '';
+        return `<article class="ped-card">
+          <div class="ped-head">
+            <div>
+              <strong style="font-size:1.05rem">${esc(p.numero_pedido)}</strong>
+              <div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(p.cliente_nome)} · ${esc(p.cliente_telefone)}</div>
             </div>
+            <span class="badge-estado ${esc(p.estado)}">${esc(p.estado)}</span>
+          </div>
+          <div class="ped-itens">${itens}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px">
+            <strong style="font-size:1.05rem">${LojaDB.formatMT(p.total)}</strong>
+            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" ${p.lodja_cliente ? 'checked' : ''} onchange="tornarCliente('${p.id}', this.checked)">
+              Cliente LODJA
+            </label>
+            <span style="color:var(--muted)">${syncOk ? '✓ Compra LODJA' + (fact ? ' · Fact. ' + fact : '') : '○ Ainda sem compra no LODJA'}</span>
+          </div>
+          <div class="ped-actions">
+            <select class="form-control" onchange="mudar('${p.id}', this.value)">
+              ${ESTADOS.map(e => `<option value="${e}" ${e===p.estado?'selected':''}>${e}</option>`).join('')}
+            </select>
+            <button type="button" class="btn btn-sm btn-outline" onclick="syncManual('${p.id}')">↗ Enviar ao LODJA</button>
+          </div>
+          <div class="ped-meta">${esc(p.metodo_pagamento)} · ${esc(p.metodo_entrega)} · ${esc(p.morada_entrega)}
+            ${p.data_criacao ? ' · ' + new Date(p.data_criacao).toLocaleString('pt-PT') : ''}
           </div>
         </article>`;
-      }).join('') || '<p style="text-align:center;color:var(--adm-muted);padding:24px">Nenhum pedido com estes filtros</p>';
+      }).join('') || '<p class="empty" style="text-align:center">Sem pedidos</p>';
     }
 
-    function exportExcel(){
-      const list = filtered();
-      const rows = [['Nº','Cliente','Telefone','Total','Estado','Data'],
-        ...list.map(p=>[p.numero_pedido,p.cliente_nome,p.cliente_telefone,p.total,p.estado,p.data_criacao])];
+    function exportExcel() {
+      const rows = [
+        ['Relatório de Pedidos — LODJA Store', new Date().toLocaleString('pt-PT')],
+        [],
+        ['Nº', 'Cliente', 'Telefone', 'Total', 'Estado', 'Cliente LODJA', 'Sync LODJA', 'Pagamento', 'Entrega', 'Data'],
+        ...todos.map(p => [
+          p.numero_pedido, p.cliente_nome, p.cliente_telefone, p.total, p.estado,
+          p.lodja_cliente ? 'sim' : 'não',
+          (p.lodja_sync || localStorage.getItem('lv_sync_'+p.numero_pedido)==='ok') ? 'sim' : 'não',
+          p.metodo_pagamento, p.metodo_entrega, p.data_criacao
+        ])
+      ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Pedidos');
-      XLSX.writeFile(wb, 'pedidos-'+Date.now()+'.xlsx');
-    }
-    function exportPDF(){
-      const list = filtered();
-      const w = window.open('','_blank');
-      w.document.write(`<html><head><title>Pedidos</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;font-size:12px}</style></head><body>
-        <h1>Pedidos</h1><p>${new Date().toLocaleString('pt-PT')}</p>
-        <table><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Data</th></tr>
-        ${list.map(p=>`<tr><td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td><td>${p.total}</td><td>${esc(p.estado)}</td><td>${esc(p.data_criacao)}</td></tr>`).join('')}
-        </table></body></html>`);
-      w.document.close(); setTimeout(()=>w.print(), 400);
+      XLSX.writeFile(wb, 'pedidos-loja-' + Date.now() + '.xlsx');
     }
 
-    async function load(){ todos = await LojaDB.getPedidos(); render(); }
-    (async () => { initSupabase(); await LojaDB.init(); await load(); })();
+    function exportPDF() {
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedidos</title>
+        <style>body{font-family:Arial,sans-serif;padding:24px}table{border-collapse:collapse;width:100%}
+        th,td{border:1px solid #ccc;padding:8px;font-size:12px;text-align:left}th{background:#f1f5f9}</style></head><body>
+        <h1>Relatório de Pedidos</h1><p>${new Date().toLocaleString('pt-PT')}</p>
+        <table><thead><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>LODJA</th></tr></thead>
+        <tbody>${todos.map(p => `<tr>
+          <td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}<br>${esc(p.cliente_telefone)}</td>
+          <td>${p.total||0}</td><td>${esc(p.estado)}</td>
+          <td>${p.lodja_cliente?'Cliente':'-'}</td></tr>`).join('')}</tbody></table></body></html>`;
+      const w = window.open('', '_blank');
+      w.document.write(html); w.document.close();
+      setTimeout(() => w.print(), 400);
+    }
+
+    async function load() {
+      todos = await LojaDB.getPedidos();
+      render();
+    }
+
+    (async () => {
+      initSupabase();
+      await LojaDB.init();
+      await load();
+    })();
   </script>
 </body>
 </html>
