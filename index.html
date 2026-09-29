@@ -438,32 +438,51 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <link rel="icon" href="/lodjastore/logo-lodja.png">
 </head>
 <body>
-  <header class="site-header">
+    <header class="site-header">
     <div class="container header-inner">
       <a class="logo" href="index.html">
         <img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" id="brandLogo" onerror="this.style.display='none'">
         <span class="logo-mark" id="logoMark" style="display:none">L</span>
-        <span id="brandName">LODJA Store</span>
+        <span>
+          <span id="brandName">LODJA Store</span>
+          <span class="logo-sub">familyy602-blip.github.io</span>
+        </span>
       </a>
       <nav class="nav-links">
         <a href="index.html" class="active">Início</a>
         <a href="catalogo.html">Catálogo</a>
         <a href="solicitar.html">Solicitar</a>
         <a href="pedidos.html">Meus pedidos</a>
-        <a href="/lodjastore/admin/login.html">Admin</a>
+        <a href="admin/login.html">Admin</a>
         <a class="icon-btn" href="carrinho.html" title="Carrinho">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
       </nav>
+      <div class="m-header-actions" style="display:none">
+        <a class="m-search-btn" href="catalogo.html" title="Pesquisar">🔍</a>
+        <a class="icon-btn" href="carrinho.html" title="Carrinho">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
+      </div>
     </div>
   </header>
 
+  <div class="container">
+    <nav class="mobile-top-tabs" aria-label="Secções">
+      <a href="index.html" class="active">🏠 Início</a>
+      <a href="catalogo.html">▦ Catálogo</a>
+      <a href="pedidos.html">📦 Meus pedidos</a>
+      <a href="admin/login.html">👤 Admin</a>
+    </nav>
+  </div>
+
   <main class="container">
     <section class="hero">
-      <h1>Moda com estilo.<br>A sua loja online.</h1>
-      <p>Explore o catálogo, escolha tamanhos e cores, peça em minutos e acompanhe a sua encomenda.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="catalogo.html">Ver produtos</a>
-        <a class="btn btn-outline" id="btnBonus" href="#" style="display:none">Bónus Especial</a>
+      <div>
+        <h1>Moda com estilo.<br>A sua loja online.</h1>
+        <p>Explore o catálogo, escolha tamanhos e cores, peça em minutos e acompanhe a sua encomenda.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="catalogo.html">🛍 Ver produtos →</a>
+          <a class="btn btn-outline" id="btnBonus" href="#" style="display:none">Bónus Especial →</a>
+        </div>
       </div>
+      <img class="hero-visual" src="https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&q=80" alt="" onerror="this.style.display='none'">
     </section>
 
     <!-- Destaque: promoção real do LODJA v1 -->
@@ -486,18 +505,29 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       </div>
     </div>
 
+    <section class="section" id="secCategorias">
+      <div class="section-head">
+        <h2>Categorias em destaque</h2>
+        <a class="section-link" href="catalogo.html">Ver todas →</a>
+      </div>
+      <div class="cat-scroll" id="catScroll"></div>
+      <div id="chipsCats" class="chips" style="display:none"></div>
+    </section>
+
     <section class="section" id="destaques">
       <div class="section-head">
-        <h2>Em destaque</h2>
+        <h2>Produtos em destaque</h2>
+        <a class="section-link" href="catalogo.html">Ver todas →</a>
       </div>
-      <div class="grid-produtos" id="gridDestaque"></div>
+      <div class="grid-produtos scroll-x" id="gridDestaque"></div>
     </section>
 
     <section class="section" id="tendencias">
       <div class="section-head">
         <h2>Tendências</h2>
+        <a class="section-link" href="catalogo.html">Ver todas →</a>
       </div>
-      <div class="grid-produtos" id="gridTendencia"></div>
+      <div class="grid-produtos scroll-x" id="gridTendencia"></div>
     </section>
 </main>
 
@@ -609,15 +639,23 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       document.getElementById('gridTendencia').innerHTML = todos.filter(p => p.tendencia).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
 
       const cats = await LojaDB.getCategorias();
-      document.getElementById('chipsCats').innerHTML =
-        `<button type="button" class="chip active" data-id="">Todos</button>` +
-        cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
-      document.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
-        document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-        ch.classList.add('active');
-        catActiva = ch.dataset.id;
-        filtrar();
-      }));
+      const catScroll = document.getElementById('catScroll');
+      if (catScroll) {
+        const icons = {
+          default: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&q=60'
+        };
+        catScroll.innerHTML = cats.slice(0, 8).map(c => `
+          <a class="cat-chip-card" href="catalogo.html?cat=${encodeURIComponent(c.id)}">
+            <div class="cat-img"><img src="${c.imagem || icons.default}" alt="" onerror="this.src='${icons.default}'"></div>
+            <span>${(c.nome || '').replace(/</g,'')}</span>
+          </a>`).join('') || '<p class="empty">Sem categorias</p>';
+      }
+      const chips = document.getElementById('chipsCats');
+      if (chips) {
+        chips.innerHTML =
+          `<button type="button" class="chip active" data-id="">Todos</button>` +
+          cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
+      }
       filtrar();
     })();
   </script>
@@ -634,6 +672,14 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       }
     });
   </script>
+
+
+  <nav class="bottom-nav" aria-label="Navegação principal">
+    <a href="index.html" class="active"><span class="ico">🏠</span>Início</a>
+    <a href="catalogo.html"><span class="ico">▦</span>Catálogo</a>
+    <a href="carrinho.html"><span class="ico">🛒</span>Carrinho<span class="bn-badge" data-cart-count style="display:none">0</span></a>
+    <a href="admin/login.html"><span class="ico">👤</span>Conta</a>
+  </nav>
 
 </body>
 </html>

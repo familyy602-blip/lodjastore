@@ -152,7 +152,10 @@ const LojaDB = {
       // 1) Migrar dados do localStorage (se existirem) para o Supabase
       await this._migrateLocalToRemote();
 
-      // 2) Se ainda não houver produtos, criar catálogo de exemplo
+      // 2) Recuperar pedidos a partir de compras LODJA (Loja Virtual) se lv_pedidos vazio
+      await this._recuperarPedidosDeComprasLodja();
+
+      // 3) Se ainda não houver produtos, criar catálogo de exemplo
       const { data: prods } = await db.from('lv_produtos').select('id').limit(1);
       if (prods && prods.length) return;
 
@@ -212,7 +215,15 @@ const LojaDB = {
     try {
       const db = window.supabaseClient;
       if (!db) return;
-      if (localStorage.getItem('lv_migrated_to_supabase') === '1') return;
+
+      // Se ainda não há pedidos no Supabase, tenta migrar de novo do localStorage
+      let remotePedidosCount = 0;
+      try {
+        const { count } = await db.from('lv_pedidos').select('*', { count: 'exact', head: true });
+        remotePedidosCount = count || 0;
+      } catch (e) {}
+
+      if (localStorage.getItem('lv_migrated_to_supabase') === '1' && remotePedidosCount > 0) return;
 
       const cats = this._getLocal('lv_categorias');
       const subs = this._getLocal('lv_subcategorias');
@@ -319,6 +330,112 @@ const LojaDB = {
       });
     } catch (e) {
       console.warn('Migração local→Supabase', e);
+    }
+  },
+
+
+  /**
+   * Reconstrói pedidos da loja a partir de compras no LODJA
+   * (sincronizadas com observação "Loja Virtual · LOJA-...")
+   */
+  async _recuperarPedidosDeComprasLodja() {
+    try {
+      const db = window.supabaseClient;
+      if (!db) return;
+      const { count } = await db.from('lv_pedidos').select('*', { count: 'exact', head: true });
+      if (count && count > 0) return;
+
+      let compras = [];
+      {
+        const { data, error } = await db.from('compras')
+          .select('*')
+          .ilike('observacao', '%Loja Virtual%')
+          .order('created_at', { ascending: false });
+        if (!error && data && data.length) compras = data;
+      }
+      if (!compras.length) {
+        const { data: c2 } = await db.from('compras').select('*').ilike('observacao', '%LOJA-%');
+        if (c2 && c2.length) compras = c2;
+      }
+      if (!compras.length) {
+        console.info('LojaDB: sem compras LODJA da loja para recuperar');
+        return;
+      }
+
+      let recuperados = 0;
+      for (const c of compras) {
+        const obs = String(c.observacao || '');
+        let numero = null;
+        const m = obs.match(/LOJA-\d+/i);
+        if (m) numero = m[0].toUpperCase();
+        if (!numero) numero = 'LOJA-REC-' + String(c.numero_factura || c.id).replace(/\W/g, '').slice(-6);
+
+        let nome = 'Cliente loja';
+        let telefone = '';
+        if (c.cliente_id) {
+          const { data: cli } = await db.from('clientes').select('nome,telefone').eq('id', c.cliente_id).maybeSingle();
+          if (cli) {
+            nome = cli.nome || nome;
+            telefone = cli.telefone || '';
+          }
+        }
+
+        let itensTxt = '';
+        const parts = obs.split('·').map(s => s.trim());
+        if (parts.length >= 3) itensTxt = parts.slice(2).join(' · ');
+
+        const id = 'ped_rec_' + String(c.id || this.genId('x'));
+        const total = Number(c.valor) || 0;
+        const qty = Number(c.quantidade_pecas) || 1;
+        const dataC = c.data
+          ? (String(c.data).length <= 10 ? c.data + 'T12:00:00.000Z' : c.data)
+          : (c.created_at || new Date().toISOString());
+
+        const { error: e1 } = await db.from('lv_pedidos').upsert({
+          id,
+          numero_pedido: numero,
+          cliente_id: c.cliente_id || null,
+          cliente_nome: nome,
+          cliente_telefone: telefone,
+          cliente_email: null,
+          subtotal: total,
+          desconto: 0,
+          taxa_entrega: 0,
+          total: total,
+          estado: 'concluido',
+          metodo_pagamento: 'recuperado',
+          metodo_entrega: null,
+          morada_entrega: null,
+          observacoes: 'Recuperado de compra LODJA · Factura ' + (c.numero_factura || '') + (itensTxt ? ' · ' + itensTxt : ''),
+          lodja_cliente: true,
+          lodja_sync: true,
+          data_criacao: dataC,
+          data_confirmacao: dataC,
+          data_conclusao: dataC
+        });
+        if (e1) {
+          console.warn('pedido recup', e1);
+          continue;
+        }
+        await db.from('lv_pedido_itens').upsert({
+          id: this.genId('pi_'),
+          pedido_id: id,
+          produto_id: null,
+          nome_produto: itensTxt || ('Compra LOJA · ' + qty + ' peça(s)'),
+          nome: itensTxt || ('Compra LOJA · ' + qty + ' peça(s)'),
+          tamanho: null,
+          cor: null,
+          quantidade: qty,
+          preco_unitario: qty ? (total / qty) : total,
+          preco: qty ? (total / qty) : total,
+          desconto: 0,
+          subtotal: total
+        });
+        recuperados++;
+      }
+      console.info('LojaDB: pedidos recuperados de compras LODJA:', recuperados);
+    } catch (e) {
+      console.warn('Recuperar pedidos', e);
     }
   },
 

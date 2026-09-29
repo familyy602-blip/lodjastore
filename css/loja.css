@@ -422,3 +422,372 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
 .admin-centered .table-card {
   max-width: 960px;
 }
+
+/* ============================================================
+   MOBILE / TABLET APP LAYOUT (≤900px) — estilo app LODJA Store
+   ============================================================ */
+:root {
+  --navy: #0f172a;
+  --navy-2: #1e293b;
+  --bottom-h: 64px;
+}
+
+.mobile-top-tabs,
+.bottom-nav,
+.m-search-btn,
+.hero-visual,
+.cat-scroll,
+.section-link {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  body {
+    background: #f1f5f9;
+    padding-bottom: calc(var(--bottom-h) + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+  body.admin-page { padding-bottom: 0; }
+
+  .container { width: min(100% - 24px, 640px); }
+
+  /* Header escuro tipo app */
+  .site-header {
+    background: var(--navy);
+    border-bottom: none;
+    color: #fff;
+  }
+  .header-inner { padding: 12px 0; gap: 10px; }
+  .logo { color: #fff; font-size: 1rem; gap: 8px; }
+  .logo img { width: 36px; height: 36px; border-radius: 50%; }
+  .logo-sub {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    line-height: 1.2;
+  }
+  .nav-links {
+    display: none; /* tabs + bottom nav no mobile */
+  }
+  .m-header-actions {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .m-header-actions .icon-btn,
+  .m-search-btn {
+    display: grid !important;
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    border: none;
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    place-items: center;
+    font-size: 18px;
+  }
+  .m-header-actions .badge-count {
+    background: #ef4444;
+  }
+
+  /* Tabs superiores (Início / Catálogo / Meus pedidos) */
+  .mobile-top-tabs {
+    display: flex !important;
+    gap: 8px;
+    padding: 12px 0 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-top-tabs::-webkit-scrollbar { display: none; }
+  .mobile-top-tabs a {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: #fff;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(15,23,42,.04);
+  }
+  .mobile-top-tabs a.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 8px 20px rgba(79,70,229,.35);
+  }
+
+  /* Hero estilo app */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    margin: 12px 0 16px;
+    padding: 22px 18px;
+    border-radius: 22px;
+    border: none;
+    background: linear-gradient(135deg, #ede9fe 0%, #fce7f3 45%, #e0e7ff 100%);
+    min-height: 200px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .hero h1 {
+    font-size: 1.55rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .hero p { font-size: 13px; max-width: 58%; }
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    max-width: 200px;
+  }
+  .hero-actions .btn {
+    justify-content: center;
+    border-radius: 999px;
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+  .hero-actions .btn-outline {
+    background: #fff;
+    border: none;
+    color: var(--text);
+    box-shadow: 0 2px 10px rgba(15,23,42,.06);
+  }
+  .hero-visual {
+    display: block !important;
+    position: absolute;
+    right: -8px;
+    bottom: 0;
+    width: 46%;
+    max-width: 180px;
+    height: 92%;
+    object-fit: cover;
+    object-position: top center;
+    border-radius: 18px 18px 0 0;
+    pointer-events: none;
+    mask-image: linear-gradient(to top, transparent 0%, #000 18%);
+  }
+
+  /* Bonus card roxo */
+  .bonus-destaque {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 55%, #4f46e5 100%);
+    border-radius: 22px;
+    padding: 20px 18px;
+    color: #fff;
+    border: none;
+    margin: 0 0 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .bonus-destaque::after {
+    content: '📢';
+    position: absolute;
+    right: 14px;
+    bottom: 10px;
+    font-size: 48px;
+    opacity: .35;
+    transform: rotate(-12deg);
+  }
+  .bonus-destaque strong {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .bonus-destaque .btn {
+    background: #fff !important;
+    color: #4f46e5 !important;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-weight: 800;
+    z-index: 1;
+  }
+  .promo-banner {
+    border-radius: 18px;
+    margin-bottom: 16px;
+  }
+
+  /* Secções */
+  .section { margin: 8px 0 20px; }
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .section-head h2 {
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+  .section-link {
+    display: inline-flex !important;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  /* Categorias scroll horizontal */
+  .cat-scroll {
+    display: flex !important;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 4px 2px 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .cat-scroll::-webkit-scrollbar { display: none; }
+  .cat-chip-card {
+    flex: 0 0 88px;
+    text-align: center;
+  }
+  .cat-chip-card .cat-img {
+    width: 88px;
+    height: 88px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    margin-bottom: 6px;
+    box-shadow: 0 4px 14px rgba(15,23,42,.05);
+  }
+  .cat-chip-card .cat-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .cat-chip-card span {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* Produtos: grelha 2 colunas no telemóvel, scroll no destaque */
+  .grid-produtos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .grid-produtos.scroll-x {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .grid-produtos.scroll-x::-webkit-scrollbar { display: none; }
+  .grid-produtos.scroll-x .card-prod {
+    flex: 0 0 42%;
+    min-width: 140px;
+  }
+  .card-prod {
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(15,23,42,.06);
+    border: none;
+  }
+  .card-prod .thumb {
+    aspect-ratio: 1;
+    border-radius: 18px 18px 0 0;
+    background: #f8fafc;
+  }
+  .card-body { padding: 10px; }
+  .card-body h3 { font-size: 13px; }
+  .price { font-size: 13px; font-weight: 800; }
+
+  /* Bottom navigation */
+  .bottom-nav {
+    display: flex !important;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 100;
+    height: calc(var(--bottom-h) + env(safe-area-inset-bottom, 0px));
+    padding: 6px 8px env(safe-area-inset-bottom, 6px);
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    justify-content: space-around;
+    align-items: flex-start;
+    box-shadow: 0 -8px 24px rgba(15,23,42,.06);
+  }
+  .bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 12px;
+    position: relative;
+  }
+  .bottom-nav a .ico { font-size: 20px; line-height: 1; }
+  .bottom-nav a.active { color: var(--primary); }
+  .bottom-nav a .bn-badge {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 18px);
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 99px;
+    display: grid;
+    place-items: center;
+    padding: 0 3px;
+  }
+
+  .site-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 16px 0 8px;
+  }
+
+  /* Formulários / carrinho */
+  .cart-item, .table-card, .summary {
+    border-radius: 16px;
+  }
+  .btn, .btn-primary {
+    border-radius: 12px;
+  }
+  .btn-primary {
+    box-shadow: 0 8px 20px rgba(79,70,229,.25);
+  }
+
+  /* Ocultar chips de categoria desktop no mobile se existir cat-scroll */
+  #chipsCats { display: none; }
+}
+
+@media (min-width: 901px) {
+  .m-header-actions { display: none !important; }
+  .bottom-nav { display: none !important; }
+  .mobile-top-tabs { display: none !important; }
+  .hero-visual { display: none !important; }
+}
+
+/* Tablet 600-900: 3 colunas produtos */
+@media (min-width: 600px) and (max-width: 900px) {
+  .grid-produtos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid-produtos.scroll-x .card-prod {
+    flex: 0 0 28%;
+  }
+}
+
+@media (max-width: 900px) {
+  body:not(.admin-page) > .page-voltar { display: none !important; }
+}
+
