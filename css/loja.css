@@ -791,3 +791,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   body:not(.admin-page) > .page-voltar { display: none !important; }
 }
 
+
+
+/* force no hero model image */
+.hero-visual { display: none !important; }
+.logo-sub { display: none !important; }

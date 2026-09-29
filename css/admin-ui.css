@@ -238,3 +238,6 @@ body.admin-pro.no-bottom { padding-bottom: 16px; }
 /* hide old admin chrome when using admin-pro */
 body.admin-pro .admin-side,
 body.admin-pro .page-voltar { display: none !important; }
+
+.chart-wrap { position: relative; height: 240px; width: 100%; margin-top: 8px; }
+.adm-card h3, .summary h3 { margin: 0 0 8px; font-size: 15px; }
