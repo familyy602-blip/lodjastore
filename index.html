@@ -642,11 +642,12 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         const icons = {
           default: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&q=60'
         };
-        catScroll.innerHTML = cats.slice(0, 8).map(c => `
-          <a class="cat-chip-card" href="catalogo.html?cat=${encodeURIComponent(c.id)}">
-            <div class="cat-img"><img src="${c.imagem || icons.default}" alt="" onerror="this.src='${icons.default}'"></div>
-            <span>${(c.nome || '').replace(/</g,'')}</span>
-          </a>`).join('') || '<p class="empty">Sem categorias</p>';
+        catScroll.innerHTML = cats.slice(0, 8).map(c =>
+            `<a class="cat-chip-card" href="catalogo.html?cat=${encodeURIComponent(c.id)}">
+              <div class="cat-img" style="display:grid;place-items:center;font-size:36px;background:#ede9fe">${c.icone || '📂'}</div>
+              <span>${String(c.nome||'').replace(/</g,'')}</span>
+            </a>`
+          ).join('') || '';
       }
       const chips = document.getElementById('chipsCats');
       if (chips) {

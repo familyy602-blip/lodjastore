@@ -615,6 +615,16 @@ const LojaDB = {
       itens: dados.itens || []
     };
 
+    try {
+      await this.addNotificacao({
+        tipo: 'pedido',
+        titulo: 'Novo pedido ' + (pedido.numero_pedido || ''),
+        mensagem: (pedido.cliente_nome || 'Cliente') + ' · ' + this.formatMT(pedido.total),
+        ref_id: pedido.id,
+        ref_tipo: 'pedido'
+      });
+    } catch (e) {}
+
     if (this._local) {
       const pedidos = this._getLocal('lv_pedidos');
       pedidos.unshift(pedido);
@@ -650,7 +660,24 @@ const LojaDB = {
     let q = window.supabaseClient.from('lv_pedidos').select('*').order('data_criacao', { ascending: false });
     if (filtros.telefone) q = q.eq('cliente_telefone', filtros.telefone);
     const { data } = await q;
-    return data || [];
+    let list = data || [];
+    // Anexar itens (necessário para relatórios por categoria / top produtos)
+    try {
+      const ids = list.map(p => p.id).filter(Boolean);
+      if (ids.length) {
+        const { data: itens } = await window.supabaseClient
+          .from('lv_pedido_itens')
+          .select('*')
+          .in('pedido_id', ids);
+        const byPed = {};
+        (itens || []).forEach(it => {
+          if (!byPed[it.pedido_id]) byPed[it.pedido_id] = [];
+          byPed[it.pedido_id].push(it);
+        });
+        list = list.map(p => ({ ...p, itens: byPed[p.id] || p.itens || [] }));
+      }
+    } catch (e) { console.warn('itens pedidos', e); }
+    return list;
   },
 
   async getPedido(id) {
@@ -839,6 +866,90 @@ const LojaDB = {
       return data || this._getLocal('lv_categorias');
     } catch (e) { return this._getLocal('lv_categorias'); }
   },
+
+  // ----- NOTIFICAÇÕES ADMIN -----
+  async addNotificacao({ tipo, titulo, mensagem, ref_id, ref_tipo }) {
+    const row = {
+      id: this.genId('ntf_'),
+      tipo: tipo || 'info',
+      titulo: titulo || 'Notificação',
+      mensagem: mensagem || '',
+      ref_id: ref_id || null,
+      ref_tipo: ref_tipo || null,
+      lida: false,
+      data_criacao: new Date().toISOString()
+    };
+    if (this._local) {
+      const list = this._getLocal('lv_notificacoes');
+      list.unshift(row);
+      this._setLocal('lv_notificacoes', list.slice(0, 200));
+      return row;
+    }
+    try {
+      await window.supabaseClient.from('lv_notificacoes').insert(row);
+    } catch (e) {
+      // fallback local se tabela ainda não existir
+      const list = this._getLocal('lv_notificacoes');
+      list.unshift(row);
+      this._setLocal('lv_notificacoes', list.slice(0, 200));
+    }
+    return row;
+  },
+
+  async getNotificacoes({ onlyUnread } = {}) {
+    if (this._local) {
+      let list = this._getLocal('lv_notificacoes');
+      if (onlyUnread) list = list.filter(n => !n.lida);
+      return list;
+    }
+    try {
+      let q = window.supabaseClient.from('lv_notificacoes').select('*').order('data_criacao', { ascending: false }).limit(100);
+      if (onlyUnread) q = q.eq('lida', false);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      let list = this._getLocal('lv_notificacoes');
+      if (onlyUnread) list = list.filter(n => !n.lida);
+      return list;
+    }
+  },
+
+  async marcarNotificacaoLida(id) {
+    if (this._local) {
+      const list = this._getLocal('lv_notificacoes');
+      const i = list.findIndex(n => n.id === id);
+      if (i >= 0) { list[i].lida = true; this._setLocal('lv_notificacoes', list); }
+      return;
+    }
+    try {
+      await window.supabaseClient.from('lv_notificacoes').update({ lida: true }).eq('id', id);
+    } catch (e) {
+      const list = this._getLocal('lv_notificacoes');
+      const i = list.findIndex(n => n.id === id);
+      if (i >= 0) { list[i].lida = true; this._setLocal('lv_notificacoes', list); }
+    }
+  },
+
+  async marcarTodasNotificacoesLidas() {
+    if (this._local) {
+      const list = this._getLocal('lv_notificacoes').map(n => ({ ...n, lida: true }));
+      this._setLocal('lv_notificacoes', list);
+      return;
+    }
+    try {
+      await window.supabaseClient.from('lv_notificacoes').update({ lida: true }).eq('lida', false);
+    } catch (e) {
+      const list = this._getLocal('lv_notificacoes').map(n => ({ ...n, lida: true }));
+      this._setLocal('lv_notificacoes', list);
+    }
+  },
+
+  async countNotificacoesNaoLidas() {
+    const list = await this.getNotificacoes({ onlyUnread: true });
+    return list.length;
+  },
+
   formatMT(v) {
     return (Number(v) || 0).toLocaleString('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' MT';
   },

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Notificações — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
+</head>
+<body class="admin-pro">
+  <header class="adm-top">
+    <div class="adm-top-row">
+      <div class="adm-brand">
+        <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
+        <div><strong>Notificações</strong><small>Actividade do sistema</small></div>
+      </div>
+      <div class="adm-top-actions"><a class="adm-icon-btn" href="index.html">🏠</a></div>
+    </div>
+  </header>
+  <div class="adm-drawer" id="drawer">
+    <div class="scrim" onclick="toggleMenu()"></div>
+    <div class="panel">
+      <a href="index.html">📊 Dashboard</a>
+      <a href="produtos.html">👕 Produtos</a>
+      <a href="categorias.html">📂 Categorias</a>
+      <a href="pedidos.html">📦 Pedidos</a>
+      <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html" class="active">🔔 Notificações</a>
+      <a href="promocoes.html">🏷️ Promoções</a>
+      <a href="configuracoes.html">⚙️ Configurações</a>
+      <a href="/lodjastore/index.html">🏠 Ver loja</a>
+      <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
+    </div>
+  </div>
+  <div class="adm-shell">
+    <a class="adm-back" href="index.html">← Voltar</a>
+    <div class="adm-page-head">
+      <div class="ico">🔔</div>
+      <div>
+        <h1>Notificações</h1>
+        <p>Pedidos, produtos e eventos importantes do sistema.</p>
+      </div>
+    </div>
+    <div class="adm-actions-row">
+      <button type="button" class="adm-btn adm-btn-ghost" onclick="marcarTodas()">✓ Marcar todas como lidas</button>
+      <button type="button" class="adm-btn adm-btn-ghost" onclick="load()">↻ Actualizar</button>
+    </div>
+    <div class="adm-card" style="padding:0" id="lista"></div>
+  </div>
+  <nav class="adm-bottom">
+    <a href="index.html"><span class="ico">🏠</span>Início</a>
+    <a href="pedidos.html"><span class="ico">📋</span>Pedidos</a>
+    <a href="notificacoes.html" class="active"><span class="ico">🔔</span>Alertas</a>
+    <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
+  </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script>
+    if (!AdminAuth.require()) throw 0;
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/</g,'&lt;'); }
+    const iconTipo = { pedido: '📦', produto: '👕', cliente: '👤', sistema: '⚙️', info: 'ℹ️' };
+
+    async function marcarTodas() {
+      await LojaDB.marcarTodasNotificacoesLidas();
+      load();
+    }
+    async function abrir(n) {
+      if (!n.lida) await LojaDB.marcarNotificacaoLida(n.id);
+      if (n.ref_tipo === 'pedido') location.href = 'pedidos.html';
+      else if (n.ref_tipo === 'produto') location.href = 'produtos.html';
+      else load();
+    }
+    async function load() {
+      const list = await LojaDB.getNotificacoes();
+      document.getElementById('lista').innerHTML = list.map(n => `
+        <div class="ntf-item ${n.lida ? 'read' : 'unread'}" onclick='abrir(${JSON.stringify(n).replace(/'/g,"&#39;")})'>
+          <div class="dot"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <strong>${iconTipo[n.tipo]||'🔔'} ${esc(n.titulo)}</strong>
+              <span class="meta" style="font-size:11px;color:#94a3b8">${n.data_criacao ? new Date(n.data_criacao).toLocaleString('pt-PT') : ''}</span>
+            </div>
+            <div style="font-size:13px;color:#64748b;margin-top:4px">${esc(n.mensagem)}</div>
+          </div>
+        </div>
+      `).join('') || '<p style="text-align:center;padding:32px;color:#64748b">Sem notificações ainda.<br>Quando houver novos pedidos, aparecem aqui.</p>';
+    }
+    (async () => { initSupabase(); await LojaDB.init(); load(); })();
+  </script>
+</body>
+</html>

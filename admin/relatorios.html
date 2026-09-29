@@ -36,6 +36,18 @@
     </div>
   </div>
   <div class="adm-shell">
+    <div class="adm-toolbar" id="relFilters" style="margin-bottom:12px">
+      <select class="adm-select" id="fCatRel" onchange="load()">
+        <option value="">Todas as categorias</option>
+      </select>
+      <select class="adm-select" id="fPeriodoRel" onchange="load()">
+        <option value="todos">Todo o período</option>
+        <option value="7d">Últimos 7 dias</option>
+        <option value="30d">Últimos 30 dias</option>
+        <option value="mes">Este mês</option>
+        <option value="ano">Este ano</option>
+      </select>
+    </div>
     <a class="adm-back" href="index.html">← Voltar</a>
     <div class="adm-page-head">
       <div class="ico">📈</div>
@@ -77,7 +89,18 @@
       <h2 style="font-size:1rem;margin:16px 0 8px">Pedidos recentes</h2>
       <div class="table-card" style="overflow:auto"><table class="data" id="tabPed"></table></div>
     
-  </div>
+  
+    <div class="adm-section-title" style="margin-top:20px"><span>📦 Relatório de produtos</span></div>
+    <div class="adm-toolbar">
+      <div class="adm-search"><span>🔍</span><input id="qProdRel" placeholder="Filtrar produto…" oninput="renderProdutosRel()"></div>
+      <select class="adm-select" id="fCatProdRel" onchange="renderProdutosRel()">
+        <option value="">Todas categorias</option>
+      </select>
+    </div>
+    <div class="table-responsive">
+      <table class="data cards-on-mobile" id="tabProdutosRel"></table>
+    </div>
+</div>
   <nav class="adm-bottom">
     <a href="index.html"><span class="ico">🏠</span>Início</a>
     <a href="produtos.html"><span class="ico">📦</span>Produtos</a>
@@ -188,35 +211,111 @@
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, indexAxis: 'y' }
       });
 
-      // Receita por categoria (aprox via produto.categoria_id nos itens se existir)
+      // Receita por categoria (itens do pedido + mapa produto → categoria)
       const catRev = {};
       const prodById = {};
       produtos.forEach(p => { prodById[p.id] = p; });
       cats.forEach(c => { catRev[c.nome || c.id] = 0; });
-      catRev['Outros'] = 0;
       pedidos.forEach(p => {
-        if (p.estado === 'cancelado') return;
-        (p.itens || []).forEach(it => {
+        if ((p.estado || '').toLowerCase() === 'cancelado') return;
+        const itens = p.itens || [];
+        if (!itens.length) {
+          // sem itens: distribui total do pedido em "Geral"
+          catRev['Geral'] = (catRev['Geral'] || 0) + (Number(p.total) || 0);
+          return;
+        }
+        itens.forEach(it => {
           const prod = prodById[it.produtoId || it.produto_id];
           let nome = 'Outros';
           if (prod) {
             const c = cats.find(x => x.id === prod.categoria_id);
-            nome = c ? c.nome : 'Outros';
+            nome = c ? (c.nome || c.id) : 'Outros';
+          } else if (it.nome_produto || it.nome) {
+            // tenta inferir pelo nome do produto
+            const nm = (it.nome_produto || it.nome || '').toLowerCase();
+            const found = produtos.find(pr => (pr.nome || '').toLowerCase() === nm);
+            if (found) {
+              const c = cats.find(x => x.id === found.categoria_id);
+              if (c) nome = c.nome || c.id;
+            }
           }
-          catRev[nome] = (catRev[nome] || 0) + (Number(it.preco)||0) * (Number(it.quantidade)||1);
+          const unit = Number(it.preco_unitario != null ? it.preco_unitario : (it.preco != null ? it.preco : 0)) || 0;
+          const qty = Number(it.quantidade) || 1;
+          const line = Number(it.subtotal) || (unit * qty);
+          catRev[nome] = (catRev[nome] || 0) + line;
         });
       });
       const catLabels = Object.keys(catRev).filter(k => catRev[k] > 0);
-      charts.cats = new Chart(document.getElementById('chartCats'), {
-        type: 'pie',
-        data: {
-          labels: catLabels.length ? catLabels : ['Sem dados'],
-          datasets: [{
-            data: catLabels.length ? catLabels.map(k => catRev[k]) : [1],
-            backgroundColor: catLabels.map((_,i) => colors[i % colors.length])
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
+      const elC = document.getElementById('chartCats');
+      if (elC) {
+        charts.cats = new Chart(elC, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels.length ? catLabels : ['Sem vendas'],
+            datasets: [{
+              data: catLabels.length ? catLabels.map(k => catRev[k]) : [1],
+              backgroundColor: (catLabels.length ? catLabels : ['x']).map((_,i) => colors[i % colors.length])
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' },
+              title: { display: true, text: 'Receitas por categoria (MT)' },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const v = ctx.raw || 0;
+                    return ' ' + ctx.label + ': ' + Number(v).toLocaleString('pt-PT') + ' MT';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+      // tabela resumo categorias
+      const tb = document.getElementById('tabCatRev');
+      if (tb) {
+        const rows = catLabels.map(k => [k, catRev[k]]).sort((a,b)=>b[1]-a[1]);
+        tb.innerHTML = '<thead><tr><th>Categoria</th><th>Receita (MT)</th></tr></thead><tbody>' +
+          (rows.map(([n,v]) => `<tr><td data-label="Categoria">${n}</td><td data-label="Receita">${Number(v).toLocaleString('pt-PT')}</td></tr>`).join('') ||
+           '<tr><td colspan="2">Sem dados</td></tr>') + '</tbody>';
+      }
+    }
+
+    function renderProdutosRel() {
+      const q = (document.getElementById('qProdRel') && document.getElementById('qProdRel').value || '').toLowerCase();
+      const fc = document.getElementById('fCatProdRel') && document.getElementById('fCatProdRel').value;
+      let list = produtos.slice();
+      if (q) list = list.filter(p => (p.nome||'').toLowerCase().includes(q) || (p.codigo||'').toLowerCase().includes(q));
+      if (fc) list = list.filter(p => p.categoria_id === fc);
+      const catN = id => { const c = cats.find(x => x.id === id); return c ? ((c.icone||'') + ' ' + c.nome) : '—'; };
+      const el = document.getElementById('tabProdutosRel');
+      if (!el) return;
+      el.innerHTML = `<thead><tr><th>Produto</th><th>Código</th><th>Categoria</th><th>Preço</th><th>Estado</th></tr></thead>
+        <tbody>${list.map(p => `<tr>
+          <td data-label="Produto">${(p.nome||'').replace(/</g,'')}</td>
+          <td data-label="Código">${(p.codigo||'—').replace(/</g,'')}</td>
+          <td data-label="Categoria">${catN(p.categoria_id)}</td>
+          <td data-label="Preço">${LojaDB.formatMT(LojaDB.precoFinal(p))}</td>
+          <td data-label="Estado">${p.estado||'activo'}</td>
+        </tr>`).join('') || '<tr><td colspan="5">Sem produtos</td></tr>'}</tbody>`;
+    }
+
+    function filtrarPedidosPeriodo(list) {
+      const per = document.getElementById('fPeriodoRel') && document.getElementById('fPeriodoRel').value;
+      if (!per || per === 'todos') return list;
+      const now = new Date();
+      return list.filter(p => {
+        const d = new Date(p.data_criacao);
+        if (isNaN(d)) return true;
+        if (per === '7d') { const x = new Date(now); x.setDate(x.getDate()-7); return d >= x; }
+        if (per === '30d') { const x = new Date(now); x.setDate(x.getDate()-30); return d >= x; }
+        if (per === 'mes') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+        if (per === 'ano') return d.getFullYear()===now.getFullYear();
+        return true;
       });
     }
 
@@ -225,6 +324,20 @@
       produtos = await LojaDB.getProdutos({});
       pedidos = await LojaDB.getPedidos();
       cats = await LojaDB.getAllCategorias();
+      const fcEl = document.getElementById('fCatRel');
+      const fcP = document.getElementById('fCatProdRel');
+      if (fcEl) fcEl.innerHTML = '<option value="">Todas as categorias</option>' + cats.map(c => `<option value="${c.id}">${(c.icone||'')+' '+(c.nome||'')}</option>`).join('');
+      if (fcP) fcP.innerHTML = '<option value="">Todas categorias</option>' + cats.map(c => `<option value="${c.id}">${(c.icone||'')+' '+(c.nome||'')}</option>`).join('');
+      pedidos = filtrarPedidosPeriodo(pedidos);
+      const catFiltro = document.getElementById('fCatRel') && document.getElementById('fCatRel').value;
+      if (catFiltro) {
+        const prodIds = new Set(produtos.filter(p => p.categoria_id === catFiltro).map(p => p.id));
+        pedidos = pedidos.filter(p => {
+          const itens = p.itens || [];
+          if (!itens.length) return false;
+          return itens.some(it => prodIds.has(it.produto_id || it.produtoId));
+        });
+      }
 
       const pend = pedidos.filter(p => p.estado === 'pendente').length;
       const vendas = pedidos.filter(p => ['concluido','entregue','pago'].includes(p.estado))
@@ -266,6 +379,7 @@
       }));
 
       buildCharts();
+      renderProdutosRel();
     }
 
     function exportExcel() {

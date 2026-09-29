@@ -241,3 +241,21 @@ body.admin-pro .page-voltar { display: none !important; }
 
 .chart-wrap { position: relative; height: 240px; width: 100%; margin-top: 8px; }
 .adm-card h3, .summary h3 { margin: 0 0 8px; font-size: 15px; }
+.adm-notif-badge {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 16px; height: 16px; border-radius: 99px;
+  background: #ef4444; color: #fff; font-size: 10px; font-weight: 800;
+  display: grid; place-items: center; padding: 0 3px;
+}
+.adm-icon-btn { position: relative; }
+.ntf-item {
+  display: flex; gap: 10px; padding: 12px; border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+}
+.ntf-item.unread { background: #eef2ff; }
+.ntf-item .dot {
+  width: 10px; height: 10px; border-radius: 50%; background: #4f46e5;
+  margin-top: 6px; flex-shrink: 0;
+}
+.ntf-item.read .dot { background: #cbd5e1; }
+.table-responsive { margin-bottom: 12px; }

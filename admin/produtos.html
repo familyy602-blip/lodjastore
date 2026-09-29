@@ -11,11 +11,14 @@
   <style>
     .form-group{margin-bottom:12px}
     .form-group label{display:block;font-size:12px;font-weight:700;color:#64748b;margin-bottom:4px}
-    .form-control{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#fff}
+    .form-control{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#fff;box-sizing:border-box}
     .upload-zone{border:2px dashed #c7d2fe;border-radius:14px;padding:16px;text-align:center;color:#64748b;cursor:pointer;background:#f8fafc}
     .img-upload-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
     .img-upload-item{width:72px;height:72px;border-radius:10px;overflow:hidden;position:relative}
     .img-upload-item img{width:100%;height:100%;object-fit:cover}
+    .prod-grid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:640px){.prod-grid{grid-template-columns:1fr 1fr}}
+    @media(min-width:1000px){.prod-grid{grid-template-columns:1fr 1fr 1fr}}
   </style>
 </head>
 <body class="admin-pro">
@@ -25,7 +28,10 @@
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
         <div><strong>Produtos</strong><small>Admin Loja</small></div>
       </div>
-      <div class="adm-top-actions"><a class="adm-icon-btn" href="index.html">🏠</a></div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
     </div>
   </header>
   <div class="adm-drawer" id="drawer">
@@ -36,6 +42,7 @@
       <a href="categorias.html">📂 Categorias</a>
       <a href="pedidos.html">📦 Pedidos</a>
       <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
       <a href="promocoes.html">🏷️ Promoções</a>
       <a href="configuracoes.html">⚙️ Configurações</a>
       <a href="/lodjastore/index.html">🏠 Ver loja</a>
@@ -46,19 +53,25 @@
     <a class="adm-back" href="index.html">← Voltar</a>
     <div class="adm-page-head">
       <div class="ico">📦</div>
-      <div><h1>Produtos</h1><p>Gerencie os produtos da sua loja.</p></div>
+      <div><h1>Produtos</h1><p>Lista organizada e responsiva de todos os produtos.</p></div>
     </div>
     <div class="adm-actions-row">
       <button type="button" class="adm-btn adm-btn-primary" onclick="novo()">+ Novo produto</button>
       <a class="adm-btn adm-btn-ghost" href="relatorios.html">📊 Relatórios</a>
     </div>
     <div class="adm-toolbar">
-      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Pesquisar produto…" oninput="filtrar()"></div>
+      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Pesquisar produto ou código…" oninput="render()"></div>
+      <select class="adm-select" id="fCat" onchange="render()"><option value="">Todas categorias</option></select>
+      <select class="adm-select" id="fEstado" onchange="render()">
+        <option value="">Todos</option>
+        <option value="activo">Activos</option>
+        <option value="inactivo">Inactivos</option>
+      </select>
     </div>
     <div id="formBox" class="adm-card" style="display:none">
       <h3 id="formTitle" style="margin:0 0 10px">Novo produto</h3>
       <div class="form-group"><label>Nome *</label><input class="form-control" id="fNome"></div>
-      <div class="form-group"><label>Categoria</label><select class="form-control" id="fCat"></select></div>
+      <div class="form-group"><label>Categoria</label><select class="form-control" id="fCatForm"></select></div>
       <div class="form-group"><label>Código</label><input class="form-control" id="fCodigo"></div>
       <div class="form-group"><label>Descrição</label><textarea class="form-control" id="fDesc" rows="2"></textarea></div>
       <div class="form-group"><label>Preço (MT)</label><input class="form-control" id="fPreco" type="number" min="0"></div>
@@ -75,13 +88,13 @@
       <div class="form-group"><label>Cores (vírgula)</label><input class="form-control" id="fCor" placeholder="Azul,Preto"></div>
       <label><input type="checkbox" id="fDest"> Destaque</label>
       &nbsp;<label><input type="checkbox" id="fTend"> Tendência</label>
-      <div style="margin-top:12px;display:flex;gap:8px">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="adm-btn adm-btn-primary" type="button" onclick="guardar()">Guardar</button>
         <button class="adm-btn adm-btn-ghost" type="button" onclick="document.getElementById('formBox').style.display='none'">Cancelar</button>
       </div>
       <input type="hidden" id="fId">
     </div>
-    <div id="lista"></div>
+    <div id="lista" class="prod-grid"></div>
   </div>
   <nav class="adm-bottom">
     <a href="index.html"><span class="ico">🏠</span>Início</a>
@@ -89,131 +102,185 @@
     <a href="pedidos.html"><span class="ico">📋</span>Pedidos</a>
     <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
   </nav>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/lodjastore/js/supabase-config.js"></script>
   <script src="/lodjastore/js/admin-auth.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
-    function toggleMenu(){ document.getElementById("drawer").classList.toggle("open"); }
-    let editId = null;
-    let imagensUpload = [];
+    let editId = null, imagensUpload = [], todos = [], cats = [];
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
     function renderImgs() {
       const el = document.getElementById('imgPreview');
       if (!el) return;
-      el.innerHTML = imagensUpload.map((im, i) =>
-        '<div class="img-upload-item"><img src="'+im.url+'" alt=""><button type="button" onclick="imagensUpload.splice('+i+',1);renderImgs()">✕</button></div>'
+      el.innerHTML = imagensUpload.map((src, i) =>
+        `<div class="img-upload-item"><img src="${src}"><button type="button" style="position:absolute;top:2px;right:2px;border:none;background:#ef4444;color:#fff;border-radius:6px;width:22px;height:22px;cursor:pointer" onclick="imagensUpload.splice(${i},1);renderImgs()">×</button></div>`
       ).join('');
     }
-    document.addEventListener('change', async (e) => {
-      if (e.target && e.target.id === 'fFiles') {
-        for (const f of [...e.target.files]) {
-          try {
-            const url = await LojaDB.readFileAsDataURL(f);
-            imagensUpload.push({ url, ordem: imagensUpload.length, tipo: imagensUpload.length ? 'secundaria' : 'principal' });
-          } catch (err) { alert(err.message); }
-        }
-        if (imagensUpload[0]) imagensUpload[0].tipo = 'principal';
-        renderImgs();
-        e.target.value = '';
+    document.getElementById('fFiles').addEventListener('change', async (e) => {
+      for (const file of e.target.files) {
+        const dataUrl = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        imagensUpload.push(dataUrl);
       }
+      renderImgs();
+      e.target.value = '';
     });
+
     function novo() {
-      editId = null;
+      editId = null; imagensUpload = []; renderImgs();
       document.getElementById('formBox').style.display = 'block';
       document.getElementById('formTitle').textContent = 'Novo produto';
-      imagensUpload = []; renderImgs();
-      ['fNome','fCodigo','fDesc','fPreco','fPromo','fImg1','fImg2','fTam','fCor','fId'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('fId').value = '';
+      document.getElementById('fNome').value = '';
+      document.getElementById('fCodigo').value = '';
+      document.getElementById('fDesc').value = '';
+      document.getElementById('fPreco').value = '';
+      document.getElementById('fPromo').value = '';
+      document.getElementById('fImg1').value = '';
+      document.getElementById('fImg2').value = '';
+      document.getElementById('fTam').value = '';
+      document.getElementById('fCor').value = '';
       document.getElementById('fDest').checked = false;
       document.getElementById('fTend').checked = false;
+      document.getElementById('fCatForm').value = '';
     }
+
+    async function editar(id) {
+      const p = todos.find(x => x.id === id);
+      if (!p) return;
+      editId = id;
+      document.getElementById('formBox').style.display = 'block';
+      document.getElementById('formTitle').textContent = 'Editar produto';
+      document.getElementById('fId').value = p.id;
+      document.getElementById('fNome').value = p.nome || '';
+      document.getElementById('fCodigo').value = p.codigo || '';
+      document.getElementById('fDesc').value = p.descricao || '';
+      document.getElementById('fPreco').value = p.preco || 0;
+      document.getElementById('fPromo').value = p.preco_promocional != null ? p.preco_promocional : '';
+      document.getElementById('fCatForm').value = p.categoria_id || '';
+      document.getElementById('fDest').checked = !!p.destaque;
+      document.getElementById('fTend').checked = !!p.tendencia;
+      const imgs = (p.imagens || []).map(i => typeof i === 'string' ? i : i.url).filter(Boolean);
+      imagensUpload = imgs.slice();
+      document.getElementById('fImg1').value = '';
+      document.getElementById('fImg2').value = '';
+      const tams = (p.variacoes || []).map(v => v.tamanho).filter(Boolean);
+      const cores = (p.variacoes || []).map(v => v.cor).filter(Boolean);
+      document.getElementById('fTam').value = [...new Set(tams)].join(',');
+      document.getElementById('fCor').value = [...new Set(cores)].join(',');
+      renderImgs();
+      document.getElementById('formBox').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function apagar(id) {
+      if (!confirm('Apagar este produto?')) return;
+      await LojaDB.deleteProduto(id);
+      await load();
+    }
+
     async function guardar() {
       const nome = document.getElementById('fNome').value.trim();
       if (!nome) return alert('Nome obrigatório');
-      const tams = document.getElementById('fTam').value.split(',').map(s=>s.trim()).filter(Boolean);
-      const cores = document.getElementById('fCor').value.split(',').map(s=>s.trim()).filter(Boolean);
+      const urls = [
+        ...imagensUpload,
+        document.getElementById('fImg1').value.trim(),
+        document.getElementById('fImg2').value.trim()
+      ].filter(Boolean);
+      const tams = document.getElementById('fTam').value.split(',').map(s => s.trim()).filter(Boolean);
+      const cores = document.getElementById('fCor').value.split(',').map(s => s.trim()).filter(Boolean);
       const variacoes = [];
-      (tams.length ? tams : ['Único']).forEach(t => {
-        (cores.length ? cores : ['Padrão']).forEach(c => {
-          variacoes.push({ tamanho: t, cor: c, stock: 5 });
-        });
-      });
-      let imgs = imagensUpload.slice();
-      const u1 = document.getElementById('fImg1').value.trim();
-      const u2 = document.getElementById('fImg2').value.trim();
-      if (u1) imgs.push({ url: u1, ordem: imgs.length, tipo: imgs.length ? 'secundaria' : 'principal' });
-      if (u2) imgs.push({ url: u2, ordem: imgs.length, tipo: 'secundaria' });
-      if (!imgs.length) { alert('Adicione pelo menos 1 imagem (ficheiro ou URL)'); return; }
-      imgs[0].tipo = 'principal';
+      if (tams.length || cores.length) {
+        const T = tams.length ? tams : [null];
+        const C = cores.length ? cores : [null];
+        T.forEach(t => C.forEach(c => variacoes.push({ tamanho: t, cor: c, stock: 10 })));
+      }
       const prod = {
-        id: editId || undefined,
+        id: document.getElementById('fId').value || undefined,
         nome,
         codigo: document.getElementById('fCodigo').value.trim(),
         descricao: document.getElementById('fDesc').value.trim(),
-        preco: parseFloat(document.getElementById('fPreco').value) || 0,
-        preco_promocional: document.getElementById('fPromo').value ? parseFloat(document.getElementById('fPromo').value) : null,
+        categoria_id: document.getElementById('fCatForm').value || null,
+        preco: Number(document.getElementById('fPreco').value) || 0,
+        preco_promocional: document.getElementById('fPromo').value !== '' ? Number(document.getElementById('fPromo').value) : null,
         destaque: document.getElementById('fDest').checked,
         tendencia: document.getElementById('fTend').checked,
         estado: 'activo',
-        categoria_id: (document.getElementById('fCat') && document.getElementById('fCat').value) || 'cat_vest',
-        imagens: imgs,
+        imagens: urls.map((url, i) => ({ url, ordem: i, tipo: i === 0 ? 'principal' : 'secundaria' })),
         variacoes
       };
       await LojaDB.saveProduto(prod);
+      try {
+        await LojaDB.addNotificacao({
+          tipo: 'produto',
+          titulo: (prod.id ? 'Produto actualizado' : 'Novo produto') + ': ' + nome,
+          mensagem: LojaDB.formatMT(prod.preco),
+          ref_id: prod.id,
+          ref_tipo: 'produto'
+        });
+      } catch (e) {}
       document.getElementById('formBox').style.display = 'none';
-      render();
+      await load();
     }
-    async function editar(id) {
-      const p = await LojaDB.getProduto(id);
-      if (!p) return;
-      editId = p.id;
-      document.getElementById('formBox').style.display = 'block';
-      document.getElementById('formTitle').textContent = 'Editar produto';
-      document.getElementById('fNome').value = p.nome || '';
-      document.getElementById('fCodigo').value = p.codigo || '';
-      if (document.getElementById('fCat') && p.categoria_id) document.getElementById('fCat').value = p.categoria_id;
-      document.getElementById('fDesc').value = p.descricao || '';
-      document.getElementById('fPreco').value = p.preco || 0;
-      document.getElementById('fPromo').value = p.preco_promocional || '';
-      imagensUpload = (p.imagens || []).filter(im => im.url && String(im.url).startsWith('data:')).map((im,i)=>({...im,ordem:i}));
-      renderImgs();
-      const urlImgs = (p.imagens || []).filter(im => im.url && !String(im.url).startsWith('data:'));
-      document.getElementById('fImg1').value = urlImgs[0] ? urlImgs[0].url : '';
-      document.getElementById('fImg2').value = urlImgs[1] ? urlImgs[1].url : '';
-      document.getElementById('fTam').value = [...new Set((p.variacoes||[]).map(v=>v.tamanho))].join(',');
-      document.getElementById('fCor').value = [...new Set((p.variacoes||[]).map(v=>v.cor))].join(',');
-      document.getElementById('fDest').checked = !!p.destaque;
-      document.getElementById('fTend').checked = !!p.tendencia;
-    }
-    async function apagar(id) {
-      if (!confirm('Remover este produto?')) return;
-      await LojaDB.deleteProduto(id);
-      render();
-    }
-    async function render() {
-      const list = await LojaDB.getProdutos({});
-      document.getElementById('lista').innerHTML = `
-        <thead><tr><th>Produto</th><th>Preço</th><th>Flags</th><th></th></tr></thead>
-        <tbody>${list.map(p => `<tr>
-          <td><strong>${(p.nome||'').replace(/</g,'&lt;')}</strong><br><span style="color:var(--muted);font-size:12px">${p.codigo||''}</span></td>
-          <td>${LojaDB.formatMT(LojaDB.precoFinal(p))}</td>
-          <td>${p.destaque?'⭐':''} ${p.tendencia?'🔥':''}</td>
-          <td>
-            <button class="btn btn-sm btn-outline" onclick="editar('${p.id}')">Editar</button>
-            <button class="btn btn-sm btn-outline" onclick="apagar('${p.id}')">Apagar</button>
-          </td>
-        </tr>`).join('')}</tbody>`;
-    }
-    async function loadCats() {
-      const cats = await LojaDB.getCategorias();
-      const sel = document.getElementById('fCat');
-      if (!sel) return;
-      sel.innerHTML = cats.map(c => '<option value="'+c.id+'">'+(c.nome||'')+'</option>').join('')
-        || '<option value="cat_vest">Vestuário</option>';
-    }
-    (async () => { initSupabase(); await LojaDB.init(); await loadCats(); render(); })();
-  </script>
 
+    function render() {
+      const q = (document.getElementById('q').value || '').toLowerCase();
+      const fc = document.getElementById('fCat').value;
+      const fe = document.getElementById('fEstado').value;
+      let list = todos.slice();
+      if (q) list = list.filter(p => (p.nome || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q));
+      if (fc) list = list.filter(p => p.categoria_id === fc);
+      if (fe) list = list.filter(p => (p.estado || 'activo') === fe);
+      const catName = id => { const c = cats.find(x => x.id === id); return c ? c.nome : '—'; };
+      document.getElementById('lista').innerHTML = list.map(p => {
+        const img = LojaDB.imgPrincipal(p);
+        return `<article class="adm-card" style="margin:0">
+          <div class="adm-card-row">
+            <img class="adm-thumb" src="${img}" alt="" onerror="this.src='/lodjastore/logo-lodja.png'">
+            <div class="adm-card-body">
+              <h3>${esc(p.nome)}</h3>
+              <div class="meta">${esc(p.codigo) || 'sem código'} · ${esc(catName(p.categoria_id))}</div>
+              <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <strong style="font-size:15px">${LojaDB.formatMT(LojaDB.precoFinal(p))}</strong>
+                ${p.destaque ? '<span class="adm-badge info">★ Destaque</span>' : ''}
+                ${p.tendencia ? '<span class="adm-badge warn">🔥 Tendência</span>' : ''}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button type="button" class="adm-btn adm-btn-sm adm-btn-edit" onclick="editar('${p.id}')">✎ Editar</button>
+            <button type="button" class="adm-btn adm-btn-sm adm-btn-del" onclick="apagar('${p.id}')">🗑 Apagar</button>
+          </div>
+        </article>`;
+      }).join('') || '<p style="grid-column:1/-1;text-align:center;color:#64748b;padding:24px">Nenhum produto encontrado</p>';
+    }
+
+    async function load() {
+      cats = await LojaDB.getAllCategorias();
+      todos = await LojaDB.getProdutos({});
+      // admin vê todos — se getProdutos filtra inactivos, usar getAll se existir
+      document.getElementById('fCat').innerHTML = '<option value="">Todas categorias</option>' +
+        cats.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+      document.getElementById('fCatForm').innerHTML = '<option value="">—</option>' +
+        cats.map(c => `<option value="${c.id}">${(c.icone||'📂')+' '+esc(c.nome)}</option>`).join('');
+      render();
+    }
+
+    (async () => {
+      initSupabase(); await LojaDB.init();
+      await load();
+      try {
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : n; }
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>

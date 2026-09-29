@@ -17,6 +17,7 @@
         <div><strong>Categorias</strong><small>Gestão do catálogo</small></div>
       </div>
       <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
         <a class="adm-icon-btn" href="index.html">🏠</a>
       </div>
     </div>
@@ -29,6 +30,7 @@
       <a href="categorias.html" class="active">📂 Categorias</a>
       <a href="pedidos.html">📦 Pedidos</a>
       <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
       <a href="promocoes.html">🏷️ Promoções</a>
       <a href="configuracoes.html">⚙️ Configurações</a>
       <a href="/lodjastore/index.html">🏠 Ver loja</a>
@@ -41,7 +43,7 @@
       <div class="ico">▦</div>
       <div>
         <h1>Categorias</h1>
-        <p>Gerencie as categorias dos seus produtos.</p>
+        <p>Cada categoria tem um ícone único. Gerencie o catálogo.</p>
       </div>
     </div>
     <div class="adm-actions-row">
@@ -56,11 +58,18 @@
       </select>
     </div>
     <div id="formBox" class="adm-card" style="display:none">
-      <h3 style="margin:0 0 10px">Categoria</h3>
+      <h3 style="margin:0 0 10px" id="formTitle">Categoria</h3>
       <div class="form-group"><label>Nome *</label><input class="form-control" id="cNome"></div>
       <div class="form-group"><label>Descrição</label><textarea class="form-control" id="cDesc" rows="2"></textarea></div>
       <div class="form-group"><label>Estado</label>
         <select class="form-control" id="cEstado"><option value="activo">activo</option><option value="inactivo">inactivo</option></select>
+      </div>
+      <div class="form-group">
+        <label>Ícone / avatar da categoria *</label>
+        <div style="margin-bottom:8px;font-size:13px;color:#64748b">Seleccione um ícone único (não pode repetir entre categorias)</div>
+        <div class="icon-picker" id="iconPicker"></div>
+        <input type="hidden" id="cIcone" value="">
+        <div style="margin-top:8px;font-size:28px" id="iconPreview">—</div>
       </div>
       <input type="hidden" id="cId">
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -82,35 +91,82 @@
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
+    const ICONS = [
+      '👕','👔','👗','👚','🧥','👖','🩳','👙','👘','🥻',
+      '👟','🥾','👠','👡','🥿','👢','👞','🧦',
+      '🧢','👒','🎩','🎓','⛑️','👑',
+      '👜','🎒','💼','🛍️','👓','🕶️','💍','💎','⌚',
+      '🧣','🧤','🎀','💄','🩰','🎭','🧥','🦺'
+    ];
+    let allCats = [];
+    let selectedIcon = '';
+
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
     function esc(s){ return String(s||'').replace(/</g,'&lt;'); }
-    const icons = ['👕','💎','👟','👜','🧢','⌚'];
+
+    function usedIcons(exceptId) {
+      return new Set(allCats.filter(c => c.id !== exceptId && c.icone).map(c => c.icone));
+    }
+
+    function renderPicker(exceptId) {
+      const used = usedIcons(exceptId);
+      const box = document.getElementById('iconPicker');
+      box.innerHTML = ICONS.map(ic => {
+        const taken = used.has(ic) && ic !== selectedIcon;
+        return `<button type="button" ${taken?'disabled style="opacity:.35"':''}
+          class="${ic===selectedIcon?'selected':''}"
+          onclick="pickIcon('${ic}')">${ic}</button>`;
+      }).join('');
+    }
+    function pickIcon(ic) {
+      selectedIcon = ic;
+      document.getElementById('cIcone').value = ic;
+      document.getElementById('iconPreview').textContent = ic;
+      renderPicker(document.getElementById('cId').value || null);
+    }
+
     function novo(){
       document.getElementById('formBox').style.display='block';
+      document.getElementById('formTitle').textContent='Nova categoria';
       document.getElementById('cId').value='';
       document.getElementById('cNome').value='';
       document.getElementById('cDesc').value='';
       document.getElementById('cEstado').value='activo';
+      selectedIcon = '';
+      document.getElementById('cIcone').value = '';
+      document.getElementById('iconPreview').textContent = '—';
+      renderPicker(null);
     }
     async function guardar(){
       const nome=document.getElementById('cNome').value.trim();
+      const icone=document.getElementById('cIcone').value;
       if(!nome) return alert('Nome obrigatório');
+      if(!icone) return alert('Seleccione um ícone para a categoria');
+      const id = document.getElementById('cId').value || undefined;
+      const used = usedIcons(id);
+      if (used.has(icone)) return alert('Este ícone já está a ser usado por outra categoria. Escolha outro.');
       await LojaDB.saveCategoria({
-        id: document.getElementById('cId').value||undefined,
-        nome, descricao: document.getElementById('cDesc').value.trim(),
-        estado: document.getElementById('cEstado').value
+        id,
+        nome,
+        descricao: document.getElementById('cDesc').value.trim(),
+        estado: document.getElementById('cEstado').value,
+        icone
       });
       document.getElementById('formBox').style.display='none';
       load();
     }
     async function editar(id){
-      const list = await LojaDB.getAllCategorias();
-      const c = list.find(x=>x.id===id); if(!c) return;
+      const c = allCats.find(x=>x.id===id); if(!c) return;
       document.getElementById('formBox').style.display='block';
+      document.getElementById('formTitle').textContent='Editar categoria';
       document.getElementById('cId').value=c.id;
       document.getElementById('cNome').value=c.nome||'';
       document.getElementById('cDesc').value=c.descricao||'';
       document.getElementById('cEstado').value=c.estado||'activo';
+      selectedIcon = c.icone || '';
+      document.getElementById('cIcone').value = selectedIcon;
+      document.getElementById('iconPreview').textContent = selectedIcon || '—';
+      renderPicker(c.id);
     }
     async function apagar(id){
       if(!confirm('Eliminar esta categoria?')) return;
@@ -119,15 +175,17 @@
     async function load(){
       const q=(document.getElementById('q').value||'').toLowerCase();
       const fe=document.getElementById('fEst').value;
-      let cats = await LojaDB.getAllCategorias();
+      allCats = await LojaDB.getAllCategorias();
       const prods = await LojaDB.getProdutos({});
+      let cats = allCats.slice();
       if(q) cats=cats.filter(c=>(c.nome||'').toLowerCase().includes(q));
       if(fe) cats=cats.filter(c=>(c.estado||'')===fe);
-      document.getElementById('lista').innerHTML = cats.map((c,i)=>{
+      document.getElementById('lista').innerHTML = cats.map(c=>{
         const n=prods.filter(p=>p.categoria_id===c.id).length;
         const ok=(c.estado||'')==='activo';
+        const ic = c.icone || '📂';
         return `<article class="adm-card"><div class="adm-card-row">
-          <div class="adm-thumb" style="display:grid;place-items:center;font-size:24px;background:${ok?'#ede9fe':'#f1f5f9'}">${icons[i%icons.length]}</div>
+          <div class="cat-icon-badge">${ic}</div>
           <div class="adm-card-body">
             <h3>${esc(c.nome)}</h3>
             <div class="meta">${esc(c.descricao)||'—'}</div>
@@ -143,7 +201,15 @@
         </div></article>`;
       }).join('') || '<p style="text-align:center;color:#64748b;padding:20px">Sem categorias</p>';
     }
-    (async()=>{ initSupabase(); await LojaDB.init(); load(); })();
+    (async()=>{
+      initSupabase(); await LojaDB.init();
+      load();
+      try {
+        const n = await LojaDB.countNotificacoesNaoLidas();
+        const b = document.getElementById('ntfBadge');
+        if (n > 0) { b.style.display='grid'; b.textContent = n > 99 ? '99+' : n; }
+      } catch(e){}
+    })();
   </script>
 </body>
 </html>
