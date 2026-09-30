@@ -507,14 +507,28 @@ const LojaDB = {
   },
 
   async getProduto(id) {
-    if (this._local) return this._getLocal('lv_produtos').find(p => p.id === id) || null;
-    const { data } = await window.supabaseClient.from('lv_produtos').select('*').eq('id', id).maybeSingle();
-    if (data) {
-      const { data: imgs } = await window.supabaseClient.from('lv_produto_imagens').select('*').eq('produto_id', id).order('ordem');
-      const { data: vars } = await window.supabaseClient.from('lv_variacoes').select('*').eq('produto_id', id);
-      return { ...data, imagens: imgs || [], variacoes: vars || [] };
+    if (id == null || id === '') return null;
+    const sid = String(id);
+    if (this._local) return this._getLocal('lv_produtos').find(p => String(p.id) === sid) || null;
+    try {
+      const { data, error } = await window.supabaseClient.from('lv_produtos').select('*').eq('id', sid).maybeSingle();
+      if (error) console.warn('getProduto', error);
+      if (data) {
+        let imgs = [], vars = [];
+        try {
+          const r1 = await window.supabaseClient.from('lv_produto_imagens').select('*').eq('produto_id', sid).order('ordem');
+          imgs = r1.data || [];
+        } catch (e) {}
+        try {
+          const r2 = await window.supabaseClient.from('lv_variacoes').select('*').eq('produto_id', sid);
+          vars = r2.data || [];
+        } catch (e) {}
+        return { ...data, imagens: imgs, variacoes: vars };
+      }
+    } catch (e) {
+      console.warn('getProduto remote', e);
     }
-    return this._getLocal('lv_produtos').find(p => p.id === id) || null;
+    return this._getLocal('lv_produtos').find(p => String(p.id) === sid) || null;
   },
 
   async saveProduto(prod) {

@@ -496,29 +496,21 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       const cores = [...new Set(vars.filter(v => !tamanho || v.tamanho === tamanho).map(v => v.cor).filter(Boolean))];
       if (!tamanho && tamanhos[0]) tamanho = tamanhos[0];
       if (!cor && cores[0]) cor = cores[0];
-      // Stock: sem variações = disponível (99); com variações usa a combinação escolhida
+      // Stock informativo apenas — NUNCA bloqueia o carrinho (loja virtual / pedido WhatsApp)
       let stockVar = null;
       let stock = 99;
       if (vars.length) {
-        if (tamanho || cor) {
-          stockVar = vars.find(v =>
-            (!tamanho || v.tamanho === tamanho || !v.tamanho) &&
-            (!cor || v.cor === cor || !v.cor)
-          ) || vars.find(v => v.tamanho === tamanho && v.cor === cor);
-        } else {
-          stockVar = vars[0];
-        }
-        if (stockVar && stockVar.stock != null) {
-          stock = Number(stockVar.stock);
-          if (isNaN(stock)) stock = 99;
-        } else {
-          // variação sem stock definido → permitir compra
-          stock = 99;
+        stockVar = vars.find(v =>
+          (v.tamanho || '') === (tamanho || '') && (v.cor || '') === (cor || '')
+        ) || vars.find(v => (!tamanho || v.tamanho === tamanho) && (!cor || v.cor === cor)) || vars[0];
+        if (stockVar && stockVar.stock != null && stockVar.stock !== '') {
+          const n = Number(stockVar.stock);
+          stock = isNaN(n) ? 99 : n;
         }
       }
       const preco = LojaDB.precoFinal(prod);
       const promo = prod.preco_promocional != null && prod.preco_promocional < prod.preco;
-      const podeComprar = stock > 0;
+      const podeComprar = true;
 
       document.getElementById('app').innerHTML = `
         <div class="prod-layout">
@@ -550,8 +542,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
               <span style="color:var(--muted);font-size:13px">${vars.length ? ('Stock: ' + stock) : 'Disponível'}</span>
             </div>
             <div class="actions-row">
-              <button class="btn btn-primary" id="btnCart" ${podeComprar?'':'disabled'}>Adicionar ao carrinho</button>
-              <button class="btn btn-accent" id="btnNow" ${podeComprar?'':'disabled'}>Solicitar agora</button>
+              <button class="btn btn-primary" type="button" id="btnCart">Adicionar ao carrinho</button>
+              <button class="btn btn-accent" type="button" id="btnNow">Solicitar agora</button>
             </div>
             <p style="margin-top:14px;font-size:12px;color:var(--muted)">Adicionar ao carrinho não gera peças no LODJA. A fidelização só ocorre após compra validada pela loja.</p>
           </div>
@@ -562,35 +554,38 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       document.querySelectorAll('#optsCor .opt').forEach(b => b.onclick = () => { cor = b.dataset.c; render(); });
       document.getElementById('qMinus').onclick = () => { qty = Math.max(1, qty-1); document.getElementById('qVal').textContent = qty; };
       document.getElementById('qPlus').onclick = () => { qty = Math.min(stock||99, qty+1); document.getElementById('qVal').textContent = qty; };
-      document.getElementById('btnCart').onclick = () => {
-        if (typeof Cart === 'undefined') { alert('Carrinho indisponível. Actualize a página.'); return; }
-        if (!podeComprar) { toast('Sem stock disponível'); return; }
-        Cart.add({
+      function addAoCarrinho() {
+        if (typeof Cart === 'undefined' && typeof window.Cart === 'undefined') {
+          alert('Carrinho indisponível. Faça Ctrl+F5 ou verifique se js/cart.js está no GitHub.');
+          return false;
+        }
+        const C = window.Cart || Cart;
+        // NÃO enviar base64 — só URL curta ou vazio (evita falha no localStorage)
+        let img = '';
+        try {
+          const raw = LojaDB.imgPrincipal(prod);
+          if (raw && raw.indexOf('data:') !== 0 && raw.length < 400) img = raw;
+        } catch (e) {}
+        C.add({
           produtoId: prod.id,
-          nome: prod.nome,
-          imagem: LojaDB.imgPrincipal(prod),
+          nome: prod.nome || 'Produto',
+          imagem: img,
           tamanho: tamanho || '',
           cor: cor || '',
           preco: Number(preco) || 0,
-          quantidade: Math.max(1, qty || 1),
-          variacaoId: stockVar && stockVar.id ? stockVar.id : null
+          quantidade: Math.max(1, Number(qty) || 1),
+          variacaoId: (stockVar && stockVar.id) ? stockVar.id : null
         });
-        toast('Adicionado ao carrinho');
+        try { C.updateBadge(); } catch (e) {}
+        return true;
+      }
+      const btnC = document.getElementById('btnCart');
+      const btnN = document.getElementById('btnNow');
+      if (btnC) btnC.onclick = function() {
+        if (addAoCarrinho()) toast('Adicionado ao carrinho (' + (window.Cart || Cart).count() + ')');
       };
-      document.getElementById('btnNow').onclick = () => {
-        if (typeof Cart === 'undefined') { alert('Carrinho indisponível. Actualize a página.'); return; }
-        if (!podeComprar) { toast('Sem stock disponível'); return; }
-        Cart.add({
-          produtoId: prod.id,
-          nome: prod.nome,
-          imagem: LojaDB.imgPrincipal(prod),
-          tamanho: tamanho || '',
-          cor: cor || '',
-          preco: Number(preco) || 0,
-          quantidade: Math.max(1, qty || 1),
-          variacaoId: stockVar && stockVar.id ? stockVar.id : null
-        });
-        location.href = 'checkout.html';
+      if (btnN) btnN.onclick = function() {
+        if (addAoCarrinho()) location.href = 'checkout.html';
       };
     }
 
