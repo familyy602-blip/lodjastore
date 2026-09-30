@@ -120,15 +120,48 @@
         `<div class="img-upload-item"><img src="${src}"><button type="button" style="position:absolute;top:2px;right:2px;border:none;background:#ef4444;color:#fff;border-radius:6px;width:22px;height:22px;cursor:pointer" onclick="imagensUpload.splice(${i},1);renderImgs()">×</button></div>`
       ).join('');
     }
+    /** Comprime imagem para dataURL (máx. 900px, JPEG ~0.78) — evita falhas no Supabase */
+    function compressImage(file, maxSide, quality) {
+      maxSide = maxSide || 900;
+      quality = quality || 0.78;
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = reject;
+        r.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            let w = img.width, h = img.height;
+            if (w > maxSide || h > maxSide) {
+              if (w >= h) { h = Math.round(h * maxSide / w); w = maxSide; }
+              else { w = Math.round(w * maxSide / h); h = maxSide; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            try {
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (e) {
+              resolve(r.result); // fallback original
+            }
+          };
+          img.src = r.result;
+        };
+        r.readAsDataURL(file);
+      });
+    }
+
     document.getElementById('fFiles').addEventListener('change', async (e) => {
-      for (const file of e.target.files) {
-        const dataUrl = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-        imagensUpload.push(dataUrl);
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
+        try {
+          const dataUrl = await compressImage(file);
+          imagensUpload.push(dataUrl);
+        } catch (err) {
+          console.warn('imagem', err);
+          alert('Não foi possível processar a imagem: ' + (file.name || ''));
+        }
       }
       renderImgs();
       e.target.value = '';
@@ -217,17 +250,27 @@
         variacoes
       };
       const isEdit = !!document.getElementById('fId').value;
-      await LojaDB.saveProduto(prod);
-      alert(isEdit ? 'Produto actualizado com sucesso.' : 'Produto registado com sucesso.');
       try {
-        await LojaDB.addNotificacao({
-          tipo: 'produto',
-          titulo: (prod.id ? 'Produto actualizado' : 'Novo produto') + ': ' + nome,
-          mensagem: LojaDB.formatMT(prod.preco),
-          ref_id: prod.id,
-          ref_tipo: 'produto'
-        });
-      } catch (e) {}
+        await LojaDB.saveProduto(prod);
+        // guardar fallback local da 1ª imagem
+        if (prod.imagens && prod.imagens[0] && prod.imagens[0].url) {
+          try { localStorage.setItem('lv_img_fallback_' + prod.id, prod.imagens[0].url); } catch (e) {}
+        }
+        alert(isEdit ? 'Produto actualizado com sucesso.' : 'Produto registado com sucesso.');
+        try {
+          await LojaDB.addNotificacao({
+            tipo: 'produto',
+            titulo: (isEdit ? 'Produto actualizado' : 'Novo produto') + ': ' + nome,
+            mensagem: LojaDB.formatMT(prod.preco),
+            ref_id: prod.id,
+            ref_tipo: 'produto'
+          });
+        } catch (e) {}
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao guardar produto: ' + (err.message || err));
+        return;
+      }
       document.getElementById('formBox').style.display = 'none';
       await load();
     }

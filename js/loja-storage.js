@@ -519,6 +519,20 @@ const LojaDB = {
 
   async saveProduto(prod) {
     if (!prod.id) prod.id = this.genId('prod_');
+    // normalizar imagens: array de {url, ordem, tipo} ou strings
+    const imgsNorm = (prod.imagens || []).map((im, i) => {
+      const url = typeof im === 'string' ? im : (im && (im.url || im.src)) || '';
+      return {
+        id: (im && im.id) || this.genId('img_'),
+        produto_id: prod.id,
+        url,
+        ordem: (im && im.ordem != null) ? im.ordem : i,
+        tipo: (im && im.tipo) || (i === 0 ? 'principal' : 'secundaria')
+      };
+    }).filter(x => x.url);
+
+    prod.imagens = imgsNorm;
+
     if (this._local) {
       const list = this._getLocal('lv_produtos');
       const i = list.findIndex(p => p.id === prod.id);
@@ -527,23 +541,72 @@ const LojaDB = {
       this._setLocal('lv_produtos', list);
       return prod;
     }
+
+    const db = window.supabaseClient;
     const row = {
-      id: prod.id, codigo: prod.codigo, nome: prod.nome, descricao: prod.descricao,
-      categoria_id: prod.categoria_id, subcategoria_id: prod.subcategoria_id,
-      preco: prod.preco, preco_promocional: prod.preco_promocional,
-      estado: prod.estado || 'activo', destaque: !!prod.destaque, tendencia: !!prod.tendencia
+      id: prod.id,
+      codigo: prod.codigo || null,
+      nome: prod.nome,
+      descricao: prod.descricao || null,
+      categoria_id: prod.categoria_id || null,
+      subcategoria_id: prod.subcategoria_id || null,
+      preco: Number(prod.preco) || 0,
+      preco_promocional: prod.preco_promocional != null ? Number(prod.preco_promocional) : null,
+      estado: prod.estado || 'activo',
+      destaque: !!prod.destaque,
+      tendencia: !!prod.tendencia
     };
-    const { error } = await window.supabaseClient.from('lv_produtos').upsert(row);
+    const { error } = await db.from('lv_produtos').upsert(row);
     if (error) throw error;
+
+    // substituir imagens no Supabase
+    try {
+      await db.from('lv_produto_imagens').delete().eq('produto_id', prod.id);
+    } catch (e) {
+      console.warn('delete imagens', e);
+    }
+    if (imgsNorm.length) {
+      const { error: imgErr } = await db.from('lv_produto_imagens').upsert(imgsNorm);
+      if (imgErr) {
+        console.error('imagens', imgErr);
+        // fallback: gravar URL principal em localStorage para não perder
+        try {
+          const key = 'lv_img_fallback_' + prod.id;
+          localStorage.setItem(key, imgsNorm[0].url);
+        } catch (e2) {}
+        throw new Error('Produto guardado, mas falhou a gravar imagens: ' + (imgErr.message || imgErr));
+      }
+    }
+
+    // variações
+    if (prod.variacoes && prod.variacoes.length) {
+      try {
+        await db.from('lv_variacoes').delete().eq('produto_id', prod.id);
+      } catch (e) {}
+      const vars = prod.variacoes.map(v => ({
+        id: v.id || this.genId('var_'),
+        produto_id: prod.id,
+        tamanho: v.tamanho || null,
+        cor: v.cor || null,
+        codigo: v.codigo || null,
+        stock: v.stock != null ? v.stock : 0
+      }));
+      await db.from('lv_variacoes').upsert(vars);
+    }
+
     return prod;
   },
 
   async deleteProduto(id) {
     if (this._local) {
       this._setLocal('lv_produtos', this._getLocal('lv_produtos').filter(p => p.id !== id));
+      try { localStorage.removeItem('lv_img_fallback_' + id); } catch (e) {}
       return;
     }
+    try { await window.supabaseClient.from('lv_produto_imagens').delete().eq('produto_id', id); } catch (e) {}
+    try { await window.supabaseClient.from('lv_variacoes').delete().eq('produto_id', id); } catch (e) {}
     await window.supabaseClient.from('lv_produtos').delete().eq('id', id);
+    try { localStorage.removeItem('lv_img_fallback_' + id); } catch (e) {}
   },
 
   // ----- PROMOÇÕES -----
@@ -978,13 +1041,22 @@ const LojaDB = {
   },
 
   imgPrincipal(p) {
+    if (!p) {
+      const base = (typeof location !== 'undefined' && location.pathname.indexOf('/lodjastore') === 0)
+        ? '/lodjastore/' : '';
+      return base + 'logo-lodja.png';
+    }
     if (p.imagens && p.imagens.length) {
-      const main = p.imagens.find(i => i.tipo === 'principal') || p.imagens[0];
-      const url = typeof main === 'string' ? main : (main && main.url);
+      const main = p.imagens.find(i => i && i.tipo === 'principal') || p.imagens[0];
+      const url = typeof main === 'string' ? main : (main && (main.url || main.src));
       if (url) return url;
     }
     if (p.imagem) return p.imagem;
     if (p.imagem_url) return p.imagem_url;
+    try {
+      const fb = localStorage.getItem('lv_img_fallback_' + p.id);
+      if (fb) return fb;
+    } catch (e) {}
     const base = (typeof location !== 'undefined' && location.pathname.indexOf('/lodjastore') === 0)
       ? '/lodjastore/' : '';
     return base + 'logo-lodja.png';
