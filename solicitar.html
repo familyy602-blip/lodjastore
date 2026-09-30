@@ -507,12 +507,45 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script src="/lodjastore/js/lodja-bridge.js"></script>
   <script>
-    let produtos = [], prodActual = null;
+    let produtos = [], prodActual = null, categorias = [];
+
+    function produtosFiltrados() {
+      const cat = (document.getElementById('solCat') && document.getElementById('solCat').value) || '';
+      const q = ((document.getElementById('solQ') && document.getElementById('solQ').value) || '').toLowerCase().trim();
+      let list = produtos.slice();
+      if (cat) list = list.filter(p => String(p.categoria_id || '') === String(cat));
+      if (q) list = list.filter(p => (p.nome || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q));
+      return list;
+    }
+
+    function renderProdSelect() {
+      const list = produtosFiltrados();
+      const sel = document.getElementById('prodSelect');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">Seleccione…</option>' +
+        list.map(p => '<option value="'+p.id+'">'+(p.nome||'')+' — '+LojaDB.formatMT(LojaDB.precoFinal(p))+'</option>').join('');
+      if (prev && list.some(p => p.id === prev)) {
+        sel.value = prev;
+      } else {
+        sel.value = '';
+        prodActual = null;
+        document.getElementById('varBox').style.display = 'none';
+        document.getElementById('precoHint').textContent = list.length
+          ? (list.length + ' produto(s) nesta seleção')
+          : 'Nenhum produto nesta categoria';
+      }
+      if (sel.value) onProdChange();
+    }
+
+    function filtrarSol() {
+      renderProdSelect();
+    }
+
     function onProdChange() {
       const id = document.getElementById('prodSelect').value;
       prodActual = produtos.find(p => p.id === id) || null;
       const box = document.getElementById('varBox');
-      if (!prodActual) { box.style.display='none'; document.getElementById('precoHint').textContent=''; return; }
+      if (!prodActual) { box.style.display='none'; return; }
       box.style.display = 'block';
       const vars = prodActual.variacoes || [];
       const tams = [...new Set(vars.map(v => v.tamanho).filter(Boolean))];
@@ -553,9 +586,23 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     };
     (async () => {
       initSupabase(); await LojaDB.init();
+      categorias = await LojaDB.getAllCategorias();
       produtos = await LojaDB.getProdutos({});
-      document.getElementById('prodSelect').innerHTML = '<option value="">Seleccione…</option>' +
-        produtos.map(p => '<option value="'+p.id+'">'+(p.nome||'')+' — '+LojaDB.formatMT(LojaDB.precoFinal(p))+'</option>').join('');
+      // carregar variações se possível
+      try {
+        for (let i = 0; i < produtos.length; i++) {
+          if (!produtos[i].variacoes) {
+            const full = await LojaDB.getProduto(produtos[i].id);
+            if (full) produtos[i] = full;
+          }
+        }
+      } catch (e) {}
+      const catSel = document.getElementById('solCat');
+      if (catSel) {
+        catSel.innerHTML = '<option value="">Todas as categorias</option>' +
+          categorias.map(c => '<option value="'+c.id+'">'+(c.icone||'📂')+' '+(c.nome||'')+'</option>').join('');
+      }
+      renderProdSelect();
     })();
   </script>
 
@@ -579,35 +626,5 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     })();
   </script>
 
-<script>
-    window.__solProds = window.__solProds || [];
-    window.__solCats = window.__solCats || [];
-    async function setupSolCat() {
-      try {
-        if (typeof LojaDB === 'undefined') return;
-        window.__solCats = await LojaDB.getAllCategorias();
-        window.__solProds = await LojaDB.getProdutos({});
-        const sel = document.getElementById('solCat');
-        if (sel) {
-          sel.innerHTML = '<option value="">Todas as categorias</option>' +
-            window.__solCats.map(c => `<option value="${c.id}">${(c.icone||'📂')+' '+(c.nome||'')}</option>`).join('');
-        }
-      } catch(e) { console.warn(e); }
-    }
-    function filtrarSol() {
-      const cat = document.getElementById('solCat') && document.getElementById('solCat').value;
-      const q = (document.getElementById('solQ') && document.getElementById('solQ').value || '').toLowerCase();
-      let list = window.__solProds.slice();
-      if (cat) list = list.filter(p => p.categoria_id === cat);
-      if (q) list = list.filter(p => (p.nome||'').toLowerCase().includes(q));
-      // if page has custom render, dispatch event
-      window.dispatchEvent(new CustomEvent('sol-filter', { detail: { list, cat, q } }));
-      const grid = document.getElementById('lista') || document.getElementById('prodList') || document.getElementById('gridSolicitar');
-      if (grid && typeof cardHTML === 'function') {
-        grid.innerHTML = list.map(cardHTML).join('') || '<p class="empty">Sem produtos nesta categoria</p>';
-      }
-    }
-    document.addEventListener('DOMContentLoaded', () => setTimeout(setupSolCat, 800));
-  </script>
 </body>
 </html>
