@@ -187,3 +187,19 @@ ALTER TABLE lv_notificacoes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir tudo lv_notificacoes" ON lv_notificacoes;
 CREATE POLICY "Permitir tudo lv_notificacoes"
   ON lv_notificacoes FOR ALL USING (true) WITH CHECK (true);
+
+
+CREATE TABLE IF NOT EXISTS lv_carrinho (
+  id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  produto_id TEXT NOT NULL,
+  nome TEXT,
+  imagem TEXT,
+  tamanho TEXT,
+  cor TEXT,
+  preco NUMERIC DEFAULT 0,
+  quantidade INT DEFAULT 1,
+  variacao_id TEXT,
+  data_atualizacao TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lv_carrinho_device ON lv_carrinho (device_id);

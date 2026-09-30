@@ -554,19 +554,18 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       document.querySelectorAll('#optsCor .opt').forEach(b => b.onclick = () => { cor = b.dataset.c; render(); });
       document.getElementById('qMinus').onclick = () => { qty = Math.max(1, qty-1); document.getElementById('qVal').textContent = qty; };
       document.getElementById('qPlus').onclick = () => { qty = Math.min(stock||99, qty+1); document.getElementById('qVal').textContent = qty; };
-      function addAoCarrinho() {
+      async function addAoCarrinho() {
         if (typeof Cart === 'undefined' && typeof window.Cart === 'undefined') {
           alert('Carrinho indisponível. Faça Ctrl+F5 ou verifique se js/cart.js está no GitHub.');
           return false;
         }
         const C = window.Cart || Cart;
-        // NÃO enviar base64 — só URL curta ou vazio (evita falha no localStorage)
         let img = '';
         try {
           const raw = LojaDB.imgPrincipal(prod);
-          if (raw && raw.indexOf('data:') !== 0 && raw.length < 400) img = raw;
+          if (raw && String(raw).indexOf('data:') !== 0 && String(raw).length < 400) img = raw;
         } catch (e) {}
-        C.add({
+        await C.add({
           produtoId: prod.id,
           nome: prod.nome || 'Produto',
           imagem: img,
@@ -581,11 +580,17 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       }
       const btnC = document.getElementById('btnCart');
       const btnN = document.getElementById('btnNow');
-      if (btnC) btnC.onclick = function() {
-        if (addAoCarrinho()) toast('Adicionado ao carrinho (' + (window.Cart || Cart).count() + ')');
+      if (btnC) btnC.onclick = async function() {
+        btnC.disabled = true;
+        try {
+          if (await addAoCarrinho()) toast('Adicionado ao carrinho (' + (window.Cart || Cart).count() + ')');
+        } finally { btnC.disabled = false; }
       };
-      if (btnN) btnN.onclick = function() {
-        if (addAoCarrinho()) location.href = 'checkout.html';
+      if (btnN) btnN.onclick = async function() {
+        btnN.disabled = true;
+        try {
+          if (await addAoCarrinho()) location.href = 'checkout.html';
+        } finally { btnN.disabled = false; }
       };
     }
 

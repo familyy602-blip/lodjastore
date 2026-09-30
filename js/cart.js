@@ -1,102 +1,266 @@
 /**
- * Carrinho local (intenção de compra — NÃO sincroniza com LODJA)
- * Não depende do Supabase. Guarda só dados leves (sem base64 de imagens).
+ * Carrinho na base de dados Supabase (tabela lv_carrinho).
+ * O device_id só identifica o browser; os itens ficam na cloud.
  */
 const Cart = {
-  KEY: 'lv_carrinho',
+  KEY_DEVICE: 'lv_device_id',
+  _cache: [],
+  _ready: null,
 
-  get() {
-    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); }
-    catch (e) { return []; }
+  deviceId() {
+    let id = localStorage.getItem(this.KEY_DEVICE);
+    if (!id) {
+      id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(this.KEY_DEVICE, id);
+    }
+    return id;
   },
 
-  /** Nunca guardar data-URL / base64 no carrinho (estoura o localStorage) */
-  _slimImage(url) {
-    if (!url || typeof url !== 'string') return '';
-    if (url.indexOf('data:') === 0) return '';
-    if (url.length > 500) return '';
-    return url;
-  },
-
-  save(items) {
-    const slim = (items || []).map(i => ({
-      produtoId: i.produtoId,
-      nome: i.nome || 'Produto',
-      imagem: this._slimImage(i.imagem),
-      tamanho: i.tamanho || '',
-      cor: i.cor || '',
-      preco: Number(i.preco) || 0,
-      quantidade: Math.max(1, Number(i.quantidade) || 1),
-      variacaoId: i.variacaoId || null
-    }));
-    try {
-      localStorage.setItem(this.KEY, JSON.stringify(slim));
-    } catch (e) {
+  async ensureDb() {
+    if (typeof LojaDB !== 'undefined') {
       try {
-        localStorage.setItem(this.KEY, JSON.stringify(slim.map(i => ({ ...i, imagem: '' }))));
-      } catch (e2) {
-        console.error('carrinho', e2);
-        alert('Não foi possível guardar no carrinho. Tente limpar dados do site e repetir.');
-        return this.get();
+        if (!window.supabaseClient && typeof initSupabase === 'function') initSupabase();
+        await LojaDB.init();
+      } catch (e) {}
+    }
+  },
+
+  async _remote() {
+    await this.ensureDb();
+    if (typeof LojaDB !== 'undefined' && !LojaDB._local && window.supabaseClient) {
+      return window.supabaseClient;
+    }
+    return null;
+  },
+
+  async load() {
+    const db = await this._remote();
+    const device = this.deviceId();
+    if (db) {
+      try {
+        const { data, error } = await db
+          .from('lv_carrinho')
+          .select('*')
+          .eq('device_id', device)
+          .order('data_atualizacao', { ascending: false });
+        if (error) throw error;
+        this._cache = (data || []).map(r => ({
+          id: r.id,
+          produtoId: r.produto_id,
+          nome: r.nome,
+          imagem: r.imagem || '',
+          tamanho: r.tamanho || '',
+          cor: r.cor || '',
+          preco: Number(r.preco) || 0,
+          quantidade: Number(r.quantidade) || 1,
+          variacaoId: r.variacao_id || null
+        }));
+        // migrar carrinho antigo local (uma vez)
+        await this._migrateLocalIfAny(db, device);
+        this.updateBadge();
+        return this._cache;
+      } catch (e) {
+        console.warn('Carrinho remoto', e);
       }
     }
+    // fallback temporário só se Supabase/tabela indisponível
+    try {
+      this._cache = JSON.parse(localStorage.getItem('lv_carrinho') || '[]');
+    } catch (e) {
+      this._cache = [];
+    }
     this.updateBadge();
-    return slim;
+    return this._cache;
   },
 
-  add(item) {
+  async _migrateLocalIfAny(db, device) {
+    if (localStorage.getItem('lv_cart_migrated') === '1') return;
+    let local = [];
+    try { local = JSON.parse(localStorage.getItem('lv_carrinho') || '[]'); } catch (e) {}
+    if (!local.length) {
+      localStorage.setItem('lv_cart_migrated', '1');
+      return;
+    }
+    for (const it of local) {
+      if (!it.produtoId) continue;
+      const row = {
+        id: 'cart_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+        device_id: device,
+        produto_id: String(it.produtoId),
+        nome: it.nome || 'Produto',
+        imagem: (it.imagem && String(it.imagem).indexOf('data:') !== 0) ? String(it.imagem).slice(0, 400) : '',
+        tamanho: it.tamanho || '',
+        cor: it.cor || '',
+        preco: Number(it.preco) || 0,
+        quantidade: Math.max(1, Number(it.quantidade) || 1),
+        variacao_id: it.variacaoId || null,
+        data_atualizacao: new Date().toISOString()
+      };
+      try { await db.from('lv_carrinho').upsert(row); } catch (e) {}
+    }
+    localStorage.removeItem('lv_carrinho');
+    localStorage.setItem('lv_cart_migrated', '1');
+    const { data } = await db.from('lv_carrinho').select('*').eq('device_id', device);
+    this._cache = (data || []).map(r => ({
+      id: r.id,
+      produtoId: r.produto_id,
+      nome: r.nome,
+      imagem: r.imagem || '',
+      tamanho: r.tamanho || '',
+      cor: r.cor || '',
+      preco: Number(r.preco) || 0,
+      quantidade: Number(r.quantidade) || 1,
+      variacaoId: r.variacao_id || null
+    }));
+  },
+
+  /** Síncrono: devolve cache (chamar load() antes nas páginas) */
+  get() {
+    return this._cache.slice();
+  },
+
+  async add(item) {
     if (!item || item.produtoId == null || item.produtoId === '') {
-      console.warn('Cart.add: produto inválido', item);
       alert('Produto inválido para o carrinho.');
       return this.get();
     }
-    const items = this.get();
-    const key = String(item.produtoId) + '|' + (item.tamanho || '') + '|' + (item.cor || '');
-    const existing = items.find(i =>
-      String(i.produtoId) + '|' + (i.tamanho || '') + '|' + (i.cor || '') === key
-    );
-    const qty = Math.max(1, Number(item.quantidade) || 1);
-    if (existing) {
-      existing.quantidade = (Number(existing.quantidade) || 0) + qty;
-      if (!existing.nome && item.nome) existing.nome = item.nome;
-      if (!existing.preco && item.preco) existing.preco = Number(item.preco) || 0;
-    } else {
-      items.push({
-        produtoId: item.produtoId,
-        nome: item.nome || 'Produto',
-        imagem: this._slimImage(item.imagem),
-        tamanho: item.tamanho || '',
-        cor: item.cor || '',
-        preco: Number(item.preco) || 0,
-        quantidade: qty,
-        variacaoId: item.variacaoId || null
-      });
+    await this.load();
+    const device = this.deviceId();
+    const db = await this._remote();
+    const keyMatch = (i) =>
+      String(i.produtoId) === String(item.produtoId) &&
+      (i.tamanho || '') === (item.tamanho || '') &&
+      (i.cor || '') === (item.cor || '');
+
+    const existing = this._cache.find(keyMatch);
+    const qtyAdd = Math.max(1, Number(item.quantidade) || 1);
+    let img = '';
+    if (item.imagem && String(item.imagem).indexOf('data:') !== 0 && String(item.imagem).length < 400) {
+      img = String(item.imagem);
     }
-    return this.save(items);
+
+    if (db) {
+      try {
+        if (existing && existing.id) {
+          const novaQty = (Number(existing.quantidade) || 0) + qtyAdd;
+          const { error } = await db.from('lv_carrinho').update({
+            quantidade: novaQty,
+            preco: Number(item.preco) || existing.preco || 0,
+            nome: item.nome || existing.nome,
+            data_atualizacao: new Date().toISOString()
+          }).eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const row = {
+            id: 'cart_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+            device_id: device,
+            produto_id: String(item.produtoId),
+            nome: item.nome || 'Produto',
+            imagem: img,
+            tamanho: item.tamanho || '',
+            cor: item.cor || '',
+            preco: Number(item.preco) || 0,
+            quantidade: qtyAdd,
+            variacao_id: item.variacaoId || null,
+            data_atualizacao: new Date().toISOString()
+          };
+          const { error } = await db.from('lv_carrinho').insert(row);
+          if (error) throw error;
+        }
+        await this.load();
+        return this.get();
+      } catch (e) {
+        console.error('Cart.add remoto', e);
+        alert('Não foi possível gravar no carrinho (base de dados). Execute o SQL da tabela lv_carrinho no Supabase.\n' + (e.message || e));
+        return this.get();
+      }
+    }
+
+    // Fallback local se tabela ainda não existir
+    if (existing) existing.quantidade = (Number(existing.quantidade) || 0) + qtyAdd;
+    else this._cache.push({
+      id: 'local_' + Date.now(),
+      produtoId: item.produtoId,
+      nome: item.nome || 'Produto',
+      imagem: img,
+      tamanho: item.tamanho || '',
+      cor: item.cor || '',
+      preco: Number(item.preco) || 0,
+      quantidade: qtyAdd,
+      variacaoId: item.variacaoId || null
+    });
+    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+    this.updateBadge();
+    return this.get();
   },
 
-  updateQty(index, qty) {
-    const items = this.get();
-    if (!items[index]) return items;
-    if (qty <= 0) items.splice(index, 1);
-    else items[index].quantidade = qty;
-    return this.save(items);
+  async updateQty(index, qty) {
+    await this.load();
+    const it = this._cache[index];
+    if (!it) return this.get();
+    const db = await this._remote();
+    if (qty <= 0) return this.remove(index);
+
+    if (db && it.id && String(it.id).indexOf('local_') !== 0) {
+      try {
+        await db.from('lv_carrinho').update({
+          quantidade: qty,
+          data_atualizacao: new Date().toISOString()
+        }).eq('id', it.id);
+        await this.load();
+        return this.get();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    it.quantidade = qty;
+    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+    this.updateBadge();
+    return this.get();
   },
 
-  remove(index) {
-    const items = this.get();
-    items.splice(index, 1);
-    return this.save(items);
+  async remove(index) {
+    await this.load();
+    const it = this._cache[index];
+    if (!it) return this.get();
+    const db = await this._remote();
+    if (db && it.id && String(it.id).indexOf('local_') !== 0) {
+      try {
+        await db.from('lv_carrinho').delete().eq('id', it.id);
+        await this.load();
+        return this.get();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    this._cache.splice(index, 1);
+    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+    this.updateBadge();
+    return this.get();
   },
 
-  clear() { return this.save([]); },
+  async clear() {
+    const db = await this._remote();
+    const device = this.deviceId();
+    if (db) {
+      try {
+        await db.from('lv_carrinho').delete().eq('device_id', device);
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    this._cache = [];
+    try { localStorage.removeItem('lv_carrinho'); } catch (e) {}
+    this.updateBadge();
+    return [];
+  },
 
   count() {
-    return this.get().reduce((s, i) => s + (Number(i.quantidade) || 0), 0);
+    return this._cache.reduce((s, i) => s + (Number(i.quantidade) || 0), 0);
   },
 
   subtotal() {
-    return this.get().reduce((s, i) => s + (Number(i.preco) || 0) * (Number(i.quantidade) || 0), 0);
+    return this._cache.reduce((s, i) => s + (Number(i.preco) || 0) * (Number(i.quantidade) || 0), 0);
   },
 
   updateBadge() {
@@ -108,7 +272,9 @@ const Cart = {
   }
 };
 
-if (typeof window !== 'undefined') {
-  window.Cart = Cart;
-  document.addEventListener('DOMContentLoaded', () => { try { Cart.updateBadge(); } catch (e) {} });
-}
+window.Cart = Cart;
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof Cart !== 'undefined' && Cart.load) {
+    Cart.load().catch(() => {});
+  }
+});

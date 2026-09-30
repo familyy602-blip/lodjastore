@@ -514,7 +514,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script>
     (async () => {
       initSupabase(); await LojaDB.init();
-      const items = Cart.get();
+      await Cart.load();
+      await Cart.load(); const items = Cart.get();
       if (!items.length) { location.href = 'carrinho.html'; return; }
       const promos = await LojaDB.getPromocoesActivas();
       const calc = LojaDB.calcularDesconto(items, promos);
@@ -541,7 +542,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
             total: calc.total,
             itens: items
           });
-          Cart.clear();
+          await Cart.clear();
           try {
             const settings = await LojaDB.getSettings();
             window.location.href = LodjaBridge.whatsappPedidoUrl(pedido, settings);

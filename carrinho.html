@@ -486,8 +486,10 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script src="/lodjastore/js/cart.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
+    async function cartQty(i, q){ await Cart.updateQty(i, q); await render(); }
+    async function cartRem(i){ await Cart.remove(i); await render(); }
     async function render() {
-      const items = Cart.get();
+      await Cart.load(); const items = Cart.get();
       const promos = await LojaDB.getPromocoesActivas();
       const calc = LojaDB.calcularDesconto(items, promos);
       if (!items.length) {
@@ -502,10 +504,10 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
             <strong>${(it.nome||'').replace(/</g,'&lt;')}</strong>
             <div class="meta">${it.tamanho || ''} ${it.cor ? '· '+it.cor : ''}</div>
             <div class="qty-row" style="margin:8px 0 0">
-              <button type="button" onclick="Cart.updateQty(${i}, ${it.quantidade-1});render()">−</button>
+              <button type="button" onclick="cartQty(${i}, ${it.quantidade-1})">−</button>
               <span>${it.quantidade}</span>
-              <button type="button" onclick="Cart.updateQty(${i}, ${it.quantidade+1});render()">+</button>
-              <button type="button" class="btn btn-sm btn-outline" onclick="Cart.remove(${i});render()">Remover</button>
+              <button type="button" onclick="cartQty(${i}, ${it.quantidade+1})">+</button>
+              <button type="button" class="btn btn-sm btn-outline" onclick="cartRem(${i})">Remover</button>
             </div>
           </div>
           <div style="font-weight:800">${LojaDB.formatMT(it.preco * it.quantidade)}</div>
@@ -517,7 +519,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         <div class="line total"><span>Total</span><span>${LojaDB.formatMT(calc.total)}</span></div>
         <a class="btn btn-primary btn-block" style="margin-top:14px" href="checkout.html">Solicitar pedido</a>`;
     }
-    (async () => { initSupabase(); await LojaDB.init(); render(); })();
+    (async () => { initSupabase(); await LojaDB.init();
+      await Cart.load(); render(); })();
   </script>
 
   <nav class="bottom-nav" aria-label="Navegação principal">
