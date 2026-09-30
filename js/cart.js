@@ -10,24 +10,41 @@ const Cart = {
   },
 
   save(items) {
-    localStorage.setItem(this.KEY, JSON.stringify(items));
+    try {
+      localStorage.setItem(this.KEY, JSON.stringify(items));
+    } catch (e) {
+      // se a imagem base64 for muito grande, grava sem imagem
+      try {
+        const slim = items.map(i => ({ ...i, imagem: (i.imagem && i.imagem.length > 5000) ? '' : (i.imagem || '') }));
+        localStorage.setItem(this.KEY, JSON.stringify(slim));
+      } catch (e2) {
+        console.error('carrinho cheio', e2);
+        alert('Não foi possível guardar no carrinho. Limpe o carrinho e tente de novo.');
+        return this.get();
+      }
+    }
     this.updateBadge();
     return items;
   },
 
   add(item) {
+    if (!item || !item.produtoId) {
+      console.warn('Cart.add: produto inválido', item);
+      return this.get();
+    }
     const items = this.get();
-    const key = item.produtoId + '|' + (item.tamanho || '') + '|' + (item.cor || '');
-    const existing = items.find(i => i.produtoId + '|' + (i.tamanho || '') + '|' + (i.cor || '') === key);
-    if (existing) existing.quantidade += item.quantidade || 1;
+    const key = String(item.produtoId) + '|' + (item.tamanho || '') + '|' + (item.cor || '');
+    const existing = items.find(i => String(i.produtoId) + '|' + (i.tamanho || '') + '|' + (i.cor || '') === key);
+    const qty = Math.max(1, Number(item.quantidade) || 1);
+    if (existing) existing.quantidade = (Number(existing.quantidade) || 0) + qty;
     else items.push({
       produtoId: item.produtoId,
-      nome: item.nome,
+      nome: item.nome || 'Produto',
       imagem: item.imagem || '',
       tamanho: item.tamanho || '',
       cor: item.cor || '',
-      preco: item.preco,
-      quantidade: item.quantidade || 1,
+      preco: Number(item.preco) || 0,
+      quantidade: qty,
       variacaoId: item.variacaoId || null
     });
     this.save(items);
