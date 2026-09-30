@@ -203,3 +203,18 @@ CREATE TABLE IF NOT EXISTS lv_carrinho (
   data_atualizacao TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_lv_carrinho_device ON lv_carrinho (device_id);
+
+
+CREATE TABLE IF NOT EXISTS lv_fornecedores (
+  id TEXT PRIMARY KEY,
+  nome TEXT NOT NULL,
+  codigo TEXT,
+  contacto TEXT,
+  telefone TEXT,
+  email TEXT,
+  morada TEXT,
+  notas TEXT,
+  estado TEXT DEFAULT 'activo',
+  data_criacao TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE lv_produtos ADD COLUMN IF NOT EXISTS fornecedor_id TEXT;

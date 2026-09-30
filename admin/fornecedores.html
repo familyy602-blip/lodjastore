@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Fornecedores — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
+</head>
+<body class="admin-pro">
+  <header class="adm-top">
+    <div class="adm-top-row">
+      <div class="adm-brand">
+        <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
+        <div><strong>Fornecedores</strong><small>De onde vêm os produtos</small></div>
+      </div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
+    </div>
+  </header>
+  <div class="adm-drawer" id="drawer">
+    <div class="scrim" onclick="toggleMenu()"></div>
+    <div class="panel">
+      <a href="index.html">📊 Dashboard</a>
+      <a href="produtos.html">👕 Produtos</a>
+      <a href="categorias.html">📂 Categorias</a>
+      <a href="fornecedores.html" class="active">🏭 Fornecedores</a>
+      <a href="pedidos.html">📦 Pedidos</a>
+      <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
+      <a href="promocoes.html">🏷️ Promoções</a>
+      <a href="configuracoes.html">⚙️ Configurações</a>
+      <a href="/lodjastore/index.html">🏠 Ver loja</a>
+      <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
+    </div>
+  </div>
+  <div class="adm-shell">
+    <a class="adm-back" href="index.html">← Voltar</a>
+    <div class="adm-page-head">
+      <div class="ico">🏭</div>
+      <div>
+        <h1>Fornecedores</h1>
+        <p>Cadastre fornecedores e associe-os aos produtos pelo código.</p>
+      </div>
+    </div>
+    <div class="adm-actions-row">
+      <button type="button" class="adm-btn adm-btn-primary" onclick="novo()">+ Novo fornecedor</button>
+    </div>
+    <div class="adm-toolbar">
+      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Nome, código ou telefone…" oninput="load()"></div>
+      <select class="adm-select" id="fEst" onchange="load()">
+        <option value="">Todos</option>
+        <option value="activo">Activos</option>
+        <option value="inactivo">Inactivos</option>
+      </select>
+    </div>
+    <div id="formBox" class="adm-card" style="display:none">
+      <h3 id="formTitle" style="margin:0 0 10px">Novo fornecedor</h3>
+      <div class="form-group"><label>Nome *</label><input class="form-control" id="fNome" placeholder="Ex.: Importadora Maputo"></div>
+      <div class="form-group">
+        <label>Código do fornecedor *</label>
+        <input class="form-control" id="fCodigo" placeholder="Ex.: IMP, FOR-01" maxlength="12" style="text-transform:uppercase">
+        <small style="color:#64748b;font-size:12px">Este código entra no código do produto (ex.: IMP-BLUSA-1234)</small>
+      </div>
+      <div class="form-group"><label>Pessoa de contacto</label><input class="form-control" id="fContacto"></div>
+      <div class="form-group"><label>Telefone / WhatsApp</label><input class="form-control" id="fTel" inputmode="tel" placeholder="258…"></div>
+      <div class="form-group"><label>Email</label><input class="form-control" id="fEmail" type="email"></div>
+      <div class="form-group"><label>Morada</label><input class="form-control" id="fMorada"></div>
+      <div class="form-group"><label>Notas (como pedir, prazos…)</label><textarea class="form-control" id="fNotas" rows="2"></textarea></div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select class="form-control" id="fEstado">
+          <option value="activo">Activo</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </div>
+      <input type="hidden" id="fId">
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button type="button" class="adm-btn adm-btn-primary" onclick="guardar()">Guardar</button>
+        <button type="button" class="adm-btn adm-btn-ghost" onclick="document.getElementById('formBox').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+    <div id="lista"></div>
+  </div>
+  <nav class="adm-bottom">
+    <a href="index.html"><span class="ico">🏠</span>Início</a>
+    <a href="produtos.html"><span class="ico">📦</span>Produtos</a>
+    <a href="pedidos.html"><span class="ico">📋</span>Pedidos</a>
+    <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
+  </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/admin-alerts.js"></script>
+  <script>
+    if (!AdminAuth.require()) throw 0;
+    let todos = [], produtos = [];
+
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+    function novo() {
+      document.getElementById('formBox').style.display = 'block';
+      document.getElementById('formTitle').textContent = 'Novo fornecedor';
+      document.getElementById('fId').value = '';
+      document.getElementById('fNome').value = '';
+      document.getElementById('fCodigo').value = '';
+      document.getElementById('fContacto').value = '';
+      document.getElementById('fTel').value = '';
+      document.getElementById('fEmail').value = '';
+      document.getElementById('fMorada').value = '';
+      document.getElementById('fNotas').value = '';
+      document.getElementById('fEstado').value = 'activo';
+      document.getElementById('fNome').focus();
+    }
+
+    function editar(id) {
+      const f = todos.find(x => x.id === id);
+      if (!f) return;
+      document.getElementById('formBox').style.display = 'block';
+      document.getElementById('formTitle').textContent = 'Editar fornecedor';
+      document.getElementById('fId').value = f.id;
+      document.getElementById('fNome').value = f.nome || '';
+      document.getElementById('fCodigo').value = f.codigo || '';
+      document.getElementById('fContacto').value = f.contacto || '';
+      document.getElementById('fTel').value = f.telefone || '';
+      document.getElementById('fEmail').value = f.email || '';
+      document.getElementById('fMorada').value = f.morada || '';
+      document.getElementById('fNotas').value = f.notas || '';
+      document.getElementById('fEstado').value = f.estado || 'activo';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function guardar() {
+      const nome = document.getElementById('fNome').value.trim();
+      let codigo = document.getElementById('fCodigo').value.trim().toUpperCase().replace(/\s+/g, '-');
+      if (!nome) return alert('Nome obrigatório');
+      if (!codigo) return alert('Código do fornecedor obrigatório (ex.: IMP, FOR-01)');
+      // único código
+      const id = document.getElementById('fId').value || undefined;
+      const dup = todos.find(x => (x.codigo || '').toUpperCase() === codigo && x.id !== id);
+      if (dup) return alert('Já existe um fornecedor com o código ' + codigo);
+      try {
+        await LojaDB.saveFornecedor({
+          id,
+          nome,
+          codigo,
+          contacto: document.getElementById('fContacto').value.trim(),
+          telefone: document.getElementById('fTel').value.trim(),
+          email: document.getElementById('fEmail').value.trim(),
+          morada: document.getElementById('fMorada').value.trim(),
+          notas: document.getElementById('fNotas').value.trim(),
+          estado: document.getElementById('fEstado').value
+        });
+        alert(id ? 'Fornecedor actualizado com sucesso.' : 'Fornecedor registado com sucesso.');
+        document.getElementById('formBox').style.display = 'none';
+        await load();
+      } catch (e) {
+        alert('Erro: ' + (e.message || e));
+      }
+    }
+
+    async function apagar(id) {
+      const n = produtos.filter(p => String(p.fornecedor_id) === String(id)).length;
+      const msg = n
+        ? 'Este fornecedor está ligado a ' + n + ' produto(s). Os produtos ficam sem fornecedor. Continuar?'
+        : 'Eliminar este fornecedor?';
+      if (!confirm(msg)) return;
+      try {
+        await LojaDB.deleteFornecedor(id);
+        await load();
+      } catch (e) {
+        alert('Erro: ' + (e.message || e));
+      }
+    }
+
+    function whatsappLink(tel) {
+      const t = String(tel || '').replace(/\D/g, '');
+      if (!t) return null;
+      return 'https://wa.me/' + t;
+    }
+
+    async function load() {
+      todos = await LojaDB.getAllFornecedores();
+      try { produtos = await LojaDB.getProdutos({}); } catch (e) { produtos = []; }
+      const q = (document.getElementById('q').value || '').toLowerCase().trim();
+      const est = document.getElementById('fEst').value;
+      let list = todos.slice();
+      if (est) list = list.filter(f => f.estado === est);
+      if (q) list = list.filter(f =>
+        (f.nome || '').toLowerCase().includes(q) ||
+        (f.codigo || '').toLowerCase().includes(q) ||
+        (f.telefone || '').toLowerCase().includes(q) ||
+        (f.contacto || '').toLowerCase().includes(q)
+      );
+      document.getElementById('lista').innerHTML = list.map(f => {
+        const nProd = produtos.filter(p => String(p.fornecedor_id) === String(f.id)).length;
+        const wa = whatsappLink(f.telefone);
+        return `<article class="adm-card">
+          <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+            <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px;flex-shrink:0">${esc((f.codigo||'?').slice(0,4))}</div>
+            <div style="flex:1;min-width:160px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
+                <strong style="font-size:16px">${esc(f.nome)}</strong>
+                <span class="adm-badge ${f.estado==='activo'?'ok':'muted'}">${esc(f.estado)}</span>
+              </div>
+              <div class="meta" style="margin-top:4px">Código: <strong>${esc(f.codigo||'—')}</strong> · ${nProd} produto(s)</div>
+              <div class="meta">${esc(f.contacto||'')} ${f.telefone ? '· 📞 '+esc(f.telefone) : ''}</div>
+              ${f.email ? '<div class="meta">✉️ '+esc(f.email)+'</div>' : ''}
+              ${f.notas ? '<div style="font-size:13px;color:#64748b;margin-top:6px">'+esc(f.notas)+'</div>' : ''}
+              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
+                <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="editar('${f.id}')">Editar</button>
+                ${wa ? '<a class="adm-btn adm-btn-ghost adm-btn-sm" href="'+wa+'" target="_blank" rel="noopener">WhatsApp</a>' : ''}
+                <button type="button" class="adm-btn adm-btn-sm adm-btn-del" onclick="apagar('${f.id}')">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        </article>`;
+      }).join('') || '<p style="text-align:center;color:#64748b;padding:28px">Nenhum fornecedor. Clique em «Novo fornecedor».</p>';
+      if (window.AdminAlerts) AdminAlerts.refreshBadge();
+    }
+
+    (async () => {
+      initSupabase();
+      await LojaDB.init();
+      await load();
+    })();
+  </script>
+</body>
+</html>

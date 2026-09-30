@@ -564,6 +564,7 @@ const LojaDB = {
       descricao: prod.descricao || null,
       categoria_id: prod.categoria_id || null,
       subcategoria_id: prod.subcategoria_id || null,
+      fornecedor_id: prod.fornecedor_id || null,
       preco: Number(prod.preco) || 0,
       preco_promocional: prod.preco_promocional != null ? Number(prod.preco_promocional) : null,
       estado: prod.estado || 'activo',
@@ -621,6 +622,104 @@ const LojaDB = {
     try { await window.supabaseClient.from('lv_variacoes').delete().eq('produto_id', id); } catch (e) {}
     await window.supabaseClient.from('lv_produtos').delete().eq('id', id);
     try { localStorage.removeItem('lv_img_fallback_' + id); } catch (e) {}
+  },
+
+
+  // ----- FORNECEDORES -----
+  async getFornecedores() {
+    if (this._local) {
+      return this._getLocal('lv_fornecedores').filter(f => f.estado !== 'inactivo');
+    }
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('lv_fornecedores')
+        .select('*')
+        .order('nome');
+      if (error) throw error;
+      return (data || []).filter(f => f.estado !== 'inactivo');
+    } catch (e) {
+      console.warn('getFornecedores', e);
+      return this._getLocal('lv_fornecedores').filter(f => f.estado !== 'inactivo');
+    }
+  },
+
+  async getAllFornecedores() {
+    if (this._local) return this._getLocal('lv_fornecedores');
+    try {
+      const { data, error } = await window.supabaseClient
+        .from('lv_fornecedores')
+        .select('*')
+        .order('nome');
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      return this._getLocal('lv_fornecedores');
+    }
+  },
+
+  async getFornecedor(id) {
+    if (!id) return null;
+    const sid = String(id);
+    if (this._local) return this._getLocal('lv_fornecedores').find(f => String(f.id) === sid) || null;
+    try {
+      const { data } = await window.supabaseClient.from('lv_fornecedores').select('*').eq('id', sid).maybeSingle();
+      return data || null;
+    } catch (e) {
+      return this._getLocal('lv_fornecedores').find(f => String(f.id) === sid) || null;
+    }
+  },
+
+  async saveFornecedor(f) {
+    if (!f.id) f.id = this.genId('forn_');
+    f.codigo = (f.codigo || '').toUpperCase().trim() || null;
+    f.nome = (f.nome || '').trim();
+    f.estado = f.estado || 'activo';
+    if (this._local) {
+      const list = this._getLocal('lv_fornecedores');
+      const i = list.findIndex(x => x.id === f.id);
+      if (i >= 0) list[i] = { ...list[i], ...f };
+      else list.unshift(f);
+      this._setLocal('lv_fornecedores', list);
+      return f;
+    }
+    const row = {
+      id: f.id,
+      nome: f.nome,
+      codigo: f.codigo,
+      contacto: f.contacto || null,
+      telefone: f.telefone || null,
+      email: f.email || null,
+      morada: f.morada || null,
+      notas: f.notas || null,
+      estado: f.estado
+    };
+    const { error } = await window.supabaseClient.from('lv_fornecedores').upsert(row);
+    if (error) throw error;
+    return f;
+  },
+
+  async deleteFornecedor(id) {
+    if (this._local) {
+      this._setLocal('lv_fornecedores', this._getLocal('lv_fornecedores').filter(f => f.id !== id));
+      return;
+    }
+    // desassociar produtos
+    try {
+      await window.supabaseClient.from('lv_produtos').update({ fornecedor_id: null }).eq('fornecedor_id', id);
+    } catch (e) {}
+    await window.supabaseClient.from('lv_fornecedores').delete().eq('id', id);
+  },
+
+  /** Sugere código de artigo: CODIGO_FORNECEDOR-XXXX */
+  async sugerirCodigoProduto(fornecedorId, nome) {
+    let prefix = 'ART';
+    if (fornecedorId) {
+      const f = await this.getFornecedor(fornecedorId);
+      if (f && f.codigo) prefix = f.codigo;
+    }
+    const base = (nome || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'XX';
+    const n = Date.now().toString().slice(-4);
+    return prefix + '-' + base + '-' + n;
   },
 
   // ----- PROMOÇÕES -----

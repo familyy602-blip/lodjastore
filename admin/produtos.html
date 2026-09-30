@@ -40,6 +40,7 @@
       <a href="index.html">📊 Dashboard</a>
       <a href="produtos.html" class="active">👕 Produtos</a>
       <a href="categorias.html">📂 Categorias</a>
+      <a href="fornecedores.html">🏭 Fornecedores</a>
       <a href="pedidos.html">📦 Pedidos</a>
       <a href="relatorios.html">📈 Relatórios</a>
       <a href="notificacoes.html">🔔 Notificações</a>
@@ -72,7 +73,18 @@
       <h3 id="formTitle" style="margin:0 0 10px">Novo produto</h3>
       <div class="form-group"><label>Nome *</label><input class="form-control" id="fNome"></div>
       <div class="form-group"><label>Categoria</label><select class="form-control" id="fCatForm"></select></div>
-      <div class="form-group"><label>Código</label><input class="form-control" id="fCodigo"></div>
+      <div class="form-group">
+        <label>Fornecedor</label>
+        <select class="form-control" id="fForn" onchange="onFornChange()"></select>
+      </div>
+      <div class="form-group">
+        <label>Código do artigo</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input class="form-control" id="fCodigo" placeholder="Ex.: IMP-BLUSA-1234" style="flex:1;min-width:140px">
+          <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="gerarCodigo()">Gerar código</button>
+        </div>
+        <small style="color:#64748b;font-size:12px">O código pode incluir o prefixo do fornecedor para identificar a origem da peça.</small>
+      </div>
       <div class="form-group"><label>Descrição</label><textarea class="form-control" id="fDesc" rows="2"></textarea></div>
       <div class="form-group"><label>Preço (MT)</label><input class="form-control" id="fPreco" type="number" min="0"></div>
       <div class="form-group"><label>Preço promocional</label><input class="form-control" id="fPromo" type="number" min="0"></div>
@@ -112,6 +124,8 @@
     let editId = null, imagensUpload = [], todos = [], cats = [];
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
     function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    function catName(id){ const c = cats.find(x => x.id === id); return c ? ((c.icone||'')+' '+c.nome) : '—'; }
+    function fornName(id){ const f = forns.find(x => x.id === id); return f ? ((f.codigo||'')+' '+(f.nome||'')) : ''; }
 
     function renderImgs() {
       const el = document.getElementById('imgPreview');
@@ -184,6 +198,7 @@
       document.getElementById('fDest').checked = false;
       document.getElementById('fTend').checked = false;
       document.getElementById('fCatForm').value = '';
+      if (document.getElementById('fForn')) document.getElementById('fForn').value = '';
     }
 
     async function editar(id) {
@@ -199,6 +214,7 @@
       document.getElementById('fPreco').value = p.preco || 0;
       document.getElementById('fPromo').value = p.preco_promocional != null ? p.preco_promocional : '';
       document.getElementById('fCatForm').value = p.categoria_id || '';
+      document.getElementById('fForn').value = p.fornecedor_id || '';
       document.getElementById('fDest').checked = !!p.destaque;
       document.getElementById('fTend').checked = !!p.tendencia;
       const imgs = (p.imagens || []).map(i => typeof i === 'string' ? i : i.url).filter(Boolean);
@@ -219,6 +235,19 @@
       await load();
     }
 
+    async function onFornChange() {
+      // opcional: só avisa; código gera sob demanda
+    }
+    async function gerarCodigo() {
+      const fornId = document.getElementById('fForn').value || null;
+      const nome = document.getElementById('fNome').value.trim();
+      try {
+        const cod = await LojaDB.sugerirCodigoProduto(fornId, nome);
+        document.getElementById('fCodigo').value = cod;
+      } catch (e) {
+        alert('Não foi possível gerar código');
+      }
+    }
     async function guardar() {
       const nome = document.getElementById('fNome').value.trim();
       if (!nome) return alert('Nome obrigatório');
@@ -241,6 +270,7 @@
         codigo: document.getElementById('fCodigo').value.trim(),
         descricao: document.getElementById('fDesc').value.trim(),
         categoria_id: document.getElementById('fCatForm').value || null,
+        fornecedor_id: document.getElementById('fForn').value || null,
         preco: Number(document.getElementById('fPreco').value) || 0,
         preco_promocional: document.getElementById('fPromo').value !== '' ? Number(document.getElementById('fPromo').value) : null,
         destaque: document.getElementById('fDest').checked,
@@ -291,7 +321,7 @@
             <img class="adm-thumb" src="${img}" alt="" onerror="this.src='/lodjastore/logo-lodja.png'">
             <div class="adm-card-body">
               <h3>${esc(p.nome)}</h3>
-              <div class="meta">${esc(p.codigo) || 'sem código'} · ${esc(catName(p.categoria_id))}</div>
+              <div class="meta">${esc(p.codigo) || 'sem código'} · ${esc(catName(p.categoria_id))}${p.fornecedor_id ? ' · 🏭 '+esc(fornName(p.fornecedor_id)) : ''}</div>
               <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
                 <strong style="font-size:15px">${LojaDB.formatMT(LojaDB.precoFinal(p))}</strong>
                 ${p.destaque ? '<span class="adm-badge info">★ Destaque</span>' : ''}
@@ -311,6 +341,11 @@
       cats = await LojaDB.getAllCategorias();
       todos = await LojaDB.getProdutos({});
       // admin vê todos — se getProdutos filtra inactivos, usar getAll se existir
+      try { forns = await LojaDB.getAllFornecedores(); } catch (e) { forns = []; }
+      if (document.getElementById('fForn')) {
+        document.getElementById('fForn').innerHTML = '<option value="">— Sem fornecedor —</option>' +
+          forns.filter(f => f.estado !== 'inactivo').map(f => '<option value="'+f.id+'">'+(f.codigo||'')+' — '+(f.nome||'')+'</option>').join('');
+      }
       document.getElementById('fCat').innerHTML = '<option value="">Todas categorias</option>' +
         cats.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
       document.getElementById('fCatForm').innerHTML = '<option value="">—</option>' +
