@@ -496,11 +496,77 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
 .mobile-top-tabs,
 .bottom-nav,
 .m-search-btn,
-.hero-visual,
-.cat-scroll,
-.section-link {
+.hero-visual {
   display: none;
 }
+
+/* Categorias em destaque — todos os dispositivos */
+.cat-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 14px;
+  margin: 4px 0 8px;
+  padding: 0;
+}
+.cat-chip-card {
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: transform .15s ease;
+}
+.cat-chip-card:hover { transform: translateY(-2px); }
+.cat-chip-card .cat-img {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 110px;
+  margin: 0 auto 8px;
+  border-radius: 18px;
+  background: #ede9fe;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  box-shadow: 0 4px 14px rgba(15,23,42,.05);
+}
+.cat-chip-card .cat-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cat-chip-card span {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+  word-break: break-word;
+}
+.section-link {
+  display: inline-flex;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+}
+#chipsCats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+@media (min-width: 901px) {
+  .cat-scroll {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 18px;
+  }
+  .cat-chip-card .cat-img {
+    max-width: 120px;
+    font-size: 40px;
+  }
+}
+
 
 @media (max-width: 900px) {
   body {
@@ -695,9 +761,10 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     font-size: 13px;
   }
 
-  /* Categorias scroll horizontal */
+  /* Categorias scroll horizontal (mobile) */
   .cat-scroll {
     display: flex !important;
+    grid-template-columns: none;
     gap: 12px;
     overflow-x: auto;
     padding: 4px 2px 12px;
@@ -712,6 +779,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   .cat-chip-card .cat-img {
     width: 88px;
     height: 88px;
+    max-width: 88px;
     border-radius: 18px;
     background: #fff;
     border: 1px solid var(--border);
@@ -720,6 +788,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     place-items: center;
     margin-bottom: 6px;
     box-shadow: 0 4px 14px rgba(15,23,42,.05);
+    font-size: 36px;
   }
   .cat-chip-card .cat-img img {
     width: 100%;
