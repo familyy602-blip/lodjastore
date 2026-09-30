@@ -504,7 +504,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     function filtrar() {
       const q = (document.getElementById('busca').value||'').toLowerCase();
       let list = todos;
-      if (catActiva) list = list.filter(p => p.categoria_id === catActiva);
+      if (catActiva) list = list.filter(p => String(p.categoria_id||'') === String(catActiva));
       if (q) list = list.filter(p => (p.nome||'').toLowerCase().includes(q));
       document.getElementById('grid').innerHTML = list.map(cardHTML).join('') || '<p class="empty">Nenhum produto</p>';
     }

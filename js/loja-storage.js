@@ -616,10 +616,12 @@ const LojaDB = {
     };
 
     try {
+      const cliente = pedido.cliente_nome || 'Um cliente';
+      const num = pedido.numero_pedido || '';
       await this.addNotificacao({
         tipo: 'pedido',
-        titulo: 'Novo pedido ' + (pedido.numero_pedido || ''),
-        mensagem: (pedido.cliente_nome || 'Cliente') + ' · ' + this.formatMT(pedido.total),
+        titulo: 'Novo pedido ' + num,
+        mensagem: cliente + ' solicitou o pedido ' + num + ' · ' + this.formatMT(pedido.total) + '. Verifique a caixa de notificações.',
         ref_id: pedido.id,
         ref_tipo: 'pedido'
       });

@@ -89,6 +89,7 @@
   <script src="/lodjastore/js/supabase-config.js"></script>
   <script src="/lodjastore/js/admin-auth.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/admin-alerts.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
     const ICONS = [
@@ -145,6 +146,7 @@
       const id = document.getElementById('cId').value || undefined;
       const used = usedIcons(id);
       if (used.has(icone)) return alert('Este ícone já está a ser usado por outra categoria. Escolha outro.');
+      const isEdit = !!id;
       await LojaDB.saveCategoria({
         id,
         nome,
@@ -152,6 +154,7 @@
         estado: document.getElementById('cEstado').value,
         icone
       });
+      alert(isEdit ? 'Categoria actualizada com sucesso.' : 'Categoria registada com sucesso.');
       document.getElementById('formBox').style.display='none';
       load();
     }

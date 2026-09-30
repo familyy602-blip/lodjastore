@@ -488,6 +488,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     })();
     document.getElementById('form').onsubmit = async (e) => {
       e.preventDefault();
+      sessionStorage.removeItem('lv_alert_shown_ids');
       if (await AdminAuth.login(document.getElementById('pass').value)) location.href = 'index.html';
       else alert('Palavra-passe incorrecta');
     };
