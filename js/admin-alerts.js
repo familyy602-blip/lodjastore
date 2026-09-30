@@ -2,6 +2,41 @@
  * Alertas e pop-up de notificações no painel admin
  */
 window.AdminAlerts = {
+  _audioCtx: null,
+
+  /** Som de alerta (Web Audio — sem ficheiro externo) */
+  playSound() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!this._audioCtx) this._audioCtx = new AC();
+      const ctx = this._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const now = ctx.currentTime;
+      // dois tons tipo notificação (ding-ding)
+      const notes = [
+        { f: 880, t: 0, d: 0.12 },
+        { f: 1174.66, t: 0.14, d: 0.18 }
+      ];
+      notes.forEach(({ f, t, d }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.0001, now + t);
+        gain.gain.exponentialRampToValueAtTime(0.22, now + t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + t + d);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + t);
+        osc.stop(now + t + d + 0.02);
+      });
+    } catch (e) {
+      console.warn('som notificação', e);
+    }
+  },
+
   async refreshBadge() {
     try {
       if (!window.LojaDB || !LojaDB.countNotificacoesNaoLidas) return 0;
@@ -40,11 +75,12 @@ window.AdminAlerts = {
     document.getElementById('admAlertClose').onclick = () => { el.style.display = 'none'; };
   },
 
-  showPopup(title, htmlBody) {
+  showPopup(title, htmlBody, withSound) {
     this.ensureModal();
     document.getElementById('admAlertTitle').textContent = title;
     document.getElementById('admAlertBody').innerHTML = htmlBody;
     document.getElementById('admAlertModal').style.display = 'flex';
+    if (withSound !== false) this.playSound();
   },
 
   /** Ao entrar no admin: alerta se houver notificações não lidas (ex.: novos pedidos) */
@@ -54,7 +90,6 @@ window.AdminAlerts = {
       const list = await LojaDB.getNotificacoes({ onlyUnread: true });
       if (!list || !list.length) return;
 
-      // evita spam: no máximo 1 pop-up por sessão a cada entrada (mas actualiza se chegarem novas)
       const ids = list.map(n => n.id).sort().join(',');
       if (sessionStorage.getItem('lv_alert_shown_ids') === ids) return;
       sessionStorage.setItem('lv_alert_shown_ids', ids);
@@ -81,7 +116,7 @@ window.AdminAlerts = {
           list.slice(0, 5).map(n => '<li style="margin-bottom:6px"><strong>' + this.esc(n.titulo) + '</strong> — ' + this.esc(n.mensagem) + '</li>').join('') +
           '</ul>';
       }
-      this.showPopup(title, body);
+      this.showPopup(title, body, true);
     } catch (e) {
       console.warn('AdminAlerts', e);
     }
