@@ -10,6 +10,13 @@
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .chart-card { background:#fff; border:1px solid var(--adm-border,#e2e8f0); border-radius:18px; padding:14px; margin-bottom:12px; }
+    .chart-card h3 { margin:0 0 10px; font-size:15px; }
+    .chart-wrap { position:relative; height:240px; width:100%; }
+    .stat-grid-pro { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+    @media(min-width:700px){ .stat-grid-pro { grid-template-columns:repeat(4,1fr); } }
+  </style>
 </head>
 <body class="admin-pro">
   <header class="adm-top">
@@ -20,9 +27,11 @@
       </div>
       <div class="adm-top-actions">
         <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
-        <a class="adm-icon-btn" href="index.html">🏠</a></div>
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
     </div>
   </header>
+
   <div class="adm-drawer" id="drawer">
     <div class="scrim" onclick="toggleMenu()"></div>
     <div class="panel">
@@ -38,8 +47,18 @@
       <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
     </div>
   </div>
+
   <div class="adm-shell">
-    <div class="adm-toolbar" id="relFilters" style="margin-bottom:12px">
+    <a class="adm-back" href="index.html">← Voltar</a>
+    <div class="adm-page-head">
+      <div class="ico">📈</div>
+      <div>
+        <h1>Relatórios</h1>
+        <p>Métricas da loja virtual — vendas, tendências e sincronização LODJA.</p>
+      </div>
+    </div>
+
+    <div class="adm-toolbar">
       <select class="adm-select" id="fCatRel" onchange="load()">
         <option value="">Todas as categorias</option>
       </select>
@@ -51,49 +70,35 @@
         <option value="ano">Este ano</option>
       </select>
     </div>
-    <a class="adm-back" href="index.html">← Voltar</a>
-    <div class="adm-page-head">
-      <div class="ico">📈</div>
-      <div><h1>Relatórios</h1><p>Painel de administração</p></div>
+
+    <div class="adm-actions-row">
+      <button type="button" class="adm-btn adm-btn-primary adm-btn-sm" onclick="exportExcel()">📥 Excel</button>
+      <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="exportPDF()">📄 PDF</button>
     </div>
-    
-      <h1 class="admin-page-title">Relatórios</h1>
-      <p style="color:var(--muted);font-size:13px;margin-bottom:12px">Métricas da loja virtual — vendas, tendências e sincronização LODJA.</p>
 
-      <div class="stat-grid" id="stats"></div>
+    <div class="stat-grid-pro" id="stats"></div>
 
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:16px 0">
-        <button class="btn btn-primary" type="button" onclick="exportExcel()">📥 Excel</button>
-        <button class="btn btn-outline" type="button" onclick="exportPDF()">📄 PDF</button>
-        <button class="btn btn-outline" type="button" onclick="exportWord()">📝 Word</button>
+    <div class="chart-card">
+      <h3>Receitas por dia</h3>
+      <div class="chart-wrap"><canvas id="chartVendas"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Pedidos por estado</h3>
+      <div class="chart-wrap"><canvas id="chartEstados"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top produtos</h3>
+      <div class="chart-wrap"><canvas id="chartTop"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Receitas por categoria</h3>
+      <div class="chart-wrap"><canvas id="chartCats"></canvas></div>
+      <div class="table-responsive" style="margin-top:12px">
+        <table class="data cards-on-mobile" id="tabCatRev"></table>
       </div>
+    </div>
 
-      <div class="chart-grid">
-        <div class="chart-card">
-          <h3>Vendas por dia (últimos 14 dias)</h3>
-          <div class="chart-wrap"><canvas id="chartVendas"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Pedidos por estado</h3>
-          <div class="chart-wrap"><canvas id="chartEstados"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Top produtos (quantidade)</h3>
-          <div class="chart-wrap"><canvas id="chartTop"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Receita por categoria</h3>
-          <div class="chart-wrap"><canvas id="chartCats"></canvas></div>
-        </div>
-      </div>
-
-      <h2 style="font-size:1rem;margin:16px 0 8px">Produtos por categoria</h2>
-      <div class="table-card" style="overflow:auto"><table class="data" id="tabCat"></table></div>
-      <h2 style="font-size:1rem;margin:16px 0 8px">Pedidos recentes</h2>
-      <div class="table-card" style="overflow:auto"><table class="data" id="tabPed"></table></div>
-    
-  
-    <div class="adm-section-title" style="margin-top:20px"><span>📦 Relatório de produtos</span></div>
+    <div class="adm-section-title" style="margin-top:8px"><span>📦 Relatório de produtos</span></div>
     <div class="adm-toolbar">
       <div class="adm-search"><span>🔍</span><input id="qProdRel" placeholder="Filtrar produto…" oninput="renderProdutosRel()"></div>
       <select class="adm-select" id="fCatProdRel" onchange="renderProdutosRel()">
@@ -103,365 +108,265 @@
     <div class="table-responsive">
       <table class="data cards-on-mobile" id="tabProdutosRel"></table>
     </div>
-</div>
+  </div>
+
   <nav class="adm-bottom">
     <a href="index.html"><span class="ico">🏠</span>Início</a>
     <a href="produtos.html"><span class="ico">📦</span>Produtos</a>
     <a href="pedidos.html"><span class="ico">📋</span>Pedidos</a>
     <a href="#" onclick="toggleMenu();return false"><span class="ico">⋯</span>Mais</a>
   </nav>
-  <script>function toggleMenu(){document.getElementById('drawer').classList.toggle('open');}</script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="/lodjastore/js/supabase-config.js"></script><script src="/lodjastore/js/admin-auth.js"></script><script src="/lodjastore/js/loja-storage.js"></script><script>
-    if (!AdminAuth.require()) throw 0;
-    let produtos = [], pedidos = [], cats = [], topMap = {}, charts = {};
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script>
+    if (!AdminAuth.require()) throw 0;
+    var produtos = [], pedidosAll = [], pedidos = [], cats = [], topMap = {}, charts = {};
+    var colors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#94a3b8','#ec4899','#14b8a6','#a3e635','#f97316'];
+
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
     function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
     function dayKey(d) {
-      const x = new Date(d);
+      var x = new Date(d);
       if (isNaN(x)) return null;
       return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0');
     }
 
-    function buildCharts() {
-      Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
-      charts = {};
-
-      // Receitas / vendas por dia (baseado nos pedidos reais, não só últimos 14 dias do calendário)
-      const vendasDia = {};
-      pedidos.forEach(p => {
-        if (['cancelado'].includes((p.estado || '').toLowerCase())) return;
-        const k = dayKey(p.data_criacao || p.created_at);
-        if (!k) return;
-        vendasDia[k] = (vendasDia[k] || 0) + (Number(p.total) || 0);
-      });
-      let days = Object.keys(vendasDia).sort();
-      // se poucos dias, preenche intervalo contínuo entre min e max
-      if (days.length) {
-        const min = new Date(days[0] + 'T12:00:00');
-        const max = new Date(days[days.length - 1] + 'T12:00:00');
-        const filled = [];
-        for (let d = new Date(min); d <= max; d.setDate(d.getDate() + 1)) {
-          filled.push(dayKey(d));
-        }
-        // se intervalo > 60 dias, mostra só os dias com vendas
-        days = filled.length <= 60 ? filled : days;
-      } else {
-        // sem pedidos: eixos dos últimos 7 dias a zero (para o gráfico não falhar)
-        const now = new Date();
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(now); d.setDate(now.getDate() - i);
-          days.push(dayKey(d));
-          vendasDia[dayKey(d)] = 0;
-        }
-      }
-      days.forEach(k => { if (vendasDia[k] == null) vendasDia[k] = 0; });
-
-      const elV = document.getElementById('chartVendas');
-      if (elV) {
-      charts.vendas = new Chart(elV, {
-        type: 'line',
-        data: {
-          labels: days.map(k => {
-            const parts = k.split('-');
-            return (parts[2] || '') + '/' + (parts[1] || '');
-          }),
-          datasets: [{
-            label: 'Receitas (MT)',
-            data: days.map(k => vendasDia[k]),
-            borderColor: '#4f46e5',
-            backgroundColor: 'rgba(79,70,229,.15)',
-            fill: true,
-            tension: .3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: true },
-            title: { display: true, text: 'Receitas por dia (MT)' }
-          },
-          scales: {
-            y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('pt-PT') } }
-          }
-        }
-      });
-      }
-
-      // Estados
-      const estCount = {};
-      pedidos.forEach(p => { estCount[p.estado || '?'] = (estCount[p.estado || '?'] || 0) + 1; });
-      const estLabels = Object.keys(estCount);
-      const colors = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#94a3b8','#ec4899','#14b8a6','#a3e635','#f97316'];
-      charts.estados = new Chart(document.getElementById('chartEstados'), {
-        type: 'doughnut',
-        data: {
-          labels: estLabels,
-          datasets: [{ data: estLabels.map(k => estCount[k]), backgroundColor: estLabels.map((_,i) => colors[i % colors.length]) }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-
-      // Top produtos
-      const top = Object.entries(topMap).sort((a,b)=>b[1]-a[1]).slice(0, 8);
-      charts.top = new Chart(document.getElementById('chartTop'), {
-        type: 'bar',
-        data: {
-          labels: top.map(([n]) => n.length > 18 ? n.slice(0,16)+'…' : n),
-          datasets: [{ label: 'Qtd', data: top.map(([,q]) => q), backgroundColor: '#8b5cf6' }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, indexAxis: 'y' }
-      });
-
-      // Receita por categoria (itens do pedido + mapa produto → categoria)
-      const catRev = {};
-      const prodById = {};
-      produtos.forEach(p => { prodById[p.id] = p; });
-      cats.forEach(c => { catRev[c.nome || c.id] = 0; });
-      pedidos.forEach(p => {
-        if ((p.estado || '').toLowerCase() === 'cancelado') return;
-        const itens = p.itens || [];
-        if (!itens.length) {
-          // sem itens: distribui total do pedido em "Geral"
-          catRev['Geral'] = (catRev['Geral'] || 0) + (Number(p.total) || 0);
-          return;
-        }
-        itens.forEach(it => {
-          const prod = prodById[it.produtoId || it.produto_id];
-          let nome = 'Outros';
-          if (prod) {
-            const c = cats.find(x => x.id === prod.categoria_id);
-            nome = c ? (c.nome || c.id) : 'Outros';
-          } else if (it.nome_produto || it.nome) {
-            // tenta inferir pelo nome do produto
-            const nm = (it.nome_produto || it.nome || '').toLowerCase();
-            const found = produtos.find(pr => (pr.nome || '').toLowerCase() === nm);
-            if (found) {
-              const c = cats.find(x => x.id === found.categoria_id);
-              if (c) nome = c.nome || c.id;
-            }
-          }
-          const unit = Number(it.preco_unitario != null ? it.preco_unitario : (it.preco != null ? it.preco : 0)) || 0;
-          const qty = Number(it.quantidade) || 1;
-          const line = Number(it.subtotal) || (unit * qty);
-          catRev[nome] = (catRev[nome] || 0) + line;
-        });
-      });
-      const catLabels = Object.keys(catRev).filter(k => catRev[k] > 0);
-      const elC = document.getElementById('chartCats');
-      if (elC) {
-        charts.cats = new Chart(elC, {
-          type: 'doughnut',
-          data: {
-            labels: catLabels.length ? catLabels : ['Sem vendas'],
-            datasets: [{
-              data: catLabels.length ? catLabels.map(k => catRev[k]) : [1],
-              backgroundColor: (catLabels.length ? catLabels : ['x']).map((_,i) => colors[i % colors.length])
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { position: 'bottom' },
-              title: { display: true, text: 'Receitas por categoria (MT)' },
-              tooltip: {
-                callbacks: {
-                  label: (ctx) => {
-                    const v = ctx.raw || 0;
-                    return ' ' + ctx.label + ': ' + Number(v).toLocaleString('pt-PT') + ' MT';
-                  }
-                }
-              }
-            }
-          }
-        });
-      }
-      // tabela resumo categorias
-      const tb = document.getElementById('tabCatRev');
-      if (tb) {
-        const rows = catLabels.map(k => [k, catRev[k]]).sort((a,b)=>b[1]-a[1]);
-        tb.innerHTML = '<thead><tr><th>Categoria</th><th>Receita (MT)</th></tr></thead><tbody>' +
-          (rows.map(([n,v]) => `<tr><td data-label="Categoria">${n}</td><td data-label="Receita">${Number(v).toLocaleString('pt-PT')}</td></tr>`).join('') ||
-           '<tr><td colspan="2">Sem dados</td></tr>') + '</tbody>';
-      }
-    }
-
-    function renderProdutosRel() {
-      const q = (document.getElementById('qProdRel') && document.getElementById('qProdRel').value || '').toLowerCase();
-      const fc = document.getElementById('fCatProdRel') && document.getElementById('fCatProdRel').value;
-      let list = produtos.slice();
-      if (q) list = list.filter(p => (p.nome||'').toLowerCase().includes(q) || (p.codigo||'').toLowerCase().includes(q));
-      if (fc) list = list.filter(p => p.categoria_id === fc);
-      const catN = id => { const c = cats.find(x => x.id === id); return c ? ((c.icone||'') + ' ' + c.nome) : '—'; };
-      const el = document.getElementById('tabProdutosRel');
-      if (!el) return;
-      el.innerHTML = `<thead><tr><th>Produto</th><th>Código</th><th>Categoria</th><th>Preço</th><th>Estado</th></tr></thead>
-        <tbody>${list.map(p => `<tr>
-          <td data-label="Produto">${(p.nome||'').replace(/</g,'')}</td>
-          <td data-label="Código">${(p.codigo||'—').replace(/</g,'')}</td>
-          <td data-label="Categoria">${catN(p.categoria_id)}</td>
-          <td data-label="Preço">${LojaDB.formatMT(LojaDB.precoFinal(p))}</td>
-          <td data-label="Estado">${p.estado||'activo'}</td>
-        </tr>`).join('') || '<tr><td colspan="5">Sem produtos</td></tr>'}</tbody>`;
-    }
-
     function filtrarPedidosPeriodo(list) {
-      const per = document.getElementById('fPeriodoRel') && document.getElementById('fPeriodoRel').value;
+      var per = document.getElementById('fPeriodoRel').value;
       if (!per || per === 'todos') return list;
-      const now = new Date();
-      return list.filter(p => {
-        const d = new Date(p.data_criacao);
+      var now = new Date();
+      return list.filter(function(p) {
+        var d = new Date(p.data_criacao);
         if (isNaN(d)) return true;
-        if (per === '7d') { const x = new Date(now); x.setDate(x.getDate()-7); return d >= x; }
-        if (per === '30d') { const x = new Date(now); x.setDate(x.getDate()-30); return d >= x; }
+        if (per === '7d') { var x = new Date(now); x.setDate(x.getDate()-7); return d >= x; }
+        if (per === '30d') { var x2 = new Date(now); x2.setDate(x2.getDate()-30); return d >= x2; }
         if (per === 'mes') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
         if (per === 'ano') return d.getFullYear()===now.getFullYear();
         return true;
       });
     }
 
-    async function load() {
-      initSupabase(); await LojaDB.init();
-      produtos = await LojaDB.getProdutos({});
-      pedidos = await LojaDB.getPedidos();
-      cats = await LojaDB.getAllCategorias();
-      const fcEl = document.getElementById('fCatRel');
-      const fcP = document.getElementById('fCatProdRel');
-      if (fcEl) fcEl.innerHTML = '<option value="">Todas as categorias</option>' + cats.map(c => `<option value="${c.id}">${(c.icone||'')+' '+(c.nome||'')}</option>`).join('');
-      if (fcP) fcP.innerHTML = '<option value="">Todas categorias</option>' + cats.map(c => `<option value="${c.id}">${(c.icone||'')+' '+(c.nome||'')}</option>`).join('');
-      pedidos = filtrarPedidosPeriodo(pedidos);
-      const catFiltro = document.getElementById('fCatRel') && document.getElementById('fCatRel').value;
-      if (catFiltro) {
-        const prodIds = new Set(produtos.filter(p => p.categoria_id === catFiltro).map(p => p.id));
-        pedidos = pedidos.filter(p => {
-          const itens = p.itens || [];
-          if (!itens.length) return false;
-          return itens.some(it => prodIds.has(it.produto_id || it.produtoId));
+    function buildCharts() {
+      Object.keys(charts).forEach(function(k){ try { charts[k].destroy(); } catch(e){} });
+      charts = {};
+
+      var vendasDia = {};
+      pedidos.forEach(function(p) {
+        if ((p.estado || '').toLowerCase() === 'cancelado') return;
+        var k = dayKey(p.data_criacao || p.created_at);
+        if (!k) return;
+        vendasDia[k] = (vendasDia[k] || 0) + (Number(p.total) || 0);
+      });
+      var days = Object.keys(vendasDia).sort();
+      if (days.length) {
+        var min = new Date(days[0] + 'T12:00:00');
+        var max = new Date(days[days.length - 1] + 'T12:00:00');
+        var filled = [];
+        for (var d = new Date(min); d <= max; d.setDate(d.getDate() + 1)) filled.push(dayKey(d));
+        days = filled.length <= 60 ? filled : days;
+      } else {
+        var now = new Date();
+        for (var i = 6; i >= 0; i--) {
+          var dd = new Date(now); dd.setDate(now.getDate() - i);
+          days.push(dayKey(dd));
+          vendasDia[dayKey(dd)] = 0;
+        }
+      }
+      days.forEach(function(k){ if (vendasDia[k] == null) vendasDia[k] = 0; });
+
+      var elV = document.getElementById('chartVendas');
+      if (elV) {
+        charts.vendas = new Chart(elV, {
+          type: 'line',
+          data: {
+            labels: days.map(function(k){ var p = k.split('-'); return (p[2]||'')+'/'+(p[1]||''); }),
+            datasets: [{ label: 'Receitas (MT)', data: days.map(function(k){ return vendasDia[k]; }),
+              borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,.15)', fill: true, tension: 0.3 }]
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: { y: { beginAtZero: true } } }
         });
       }
 
-      const pend = pedidos.filter(p => p.estado === 'pendente').length;
-      const vendas = pedidos.filter(p => ['concluido','entregue','pago'].includes(p.estado))
-        .reduce((s,p) => s + (Number(p.total)||0), 0);
-      const ticket = (() => {
-        const ok = pedidos.filter(p => ['concluido','entregue','pago'].includes(p.estado));
-        if (!ok.length) return 0;
-        return Math.round(ok.reduce((s,p)=>s+(Number(p.total)||0),0) / ok.length);
-      })();
-      const syncN = pedidos.filter(p => p.lodja_sync || localStorage.getItem('lv_sync_'+p.numero_pedido)==='ok').length;
+      var estCount = {};
+      pedidos.forEach(function(p){ estCount[p.estado || '?'] = (estCount[p.estado || '?'] || 0) + 1; });
+      var estLabels = Object.keys(estCount);
+      var elE = document.getElementById('chartEstados');
+      if (elE) {
+        charts.estados = new Chart(elE, {
+          type: 'doughnut',
+          data: { labels: estLabels.length ? estLabels : ['Sem dados'],
+            datasets: [{ data: estLabels.length ? estLabels.map(function(k){ return estCount[k]; }) : [1],
+              backgroundColor: (estLabels.length?estLabels:['x']).map(function(_,i){ return colors[i % colors.length]; }) }] },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+      }
 
-      document.getElementById('stats').innerHTML = `
-        <div class="stat"><div class="l">Produtos</div><div class="v">${produtos.length}</div></div>
-        <div class="stat"><div class="l">Pedidos</div><div class="v">${pedidos.length}</div></div>
-        <div class="stat"><div class="l">Pendentes</div><div class="v">${pend}</div></div>
-        <div class="stat"><div class="l">Vendas MT</div><div class="v">${vendas.toLocaleString('pt-PT')}</div></div>
-        <div class="stat"><div class="l">Valor médio</div><div class="v">${ticket.toLocaleString('pt-PT')}</div></div>
-        <div class="stat"><div class="l">Sync LODJA</div><div class="v">${syncN}</div></div>`;
+      var top = Object.keys(topMap).map(function(n){ return [n, topMap[n]]; }).sort(function(a,b){ return b[1]-a[1]; }).slice(0, 8);
+      var elT = document.getElementById('chartTop');
+      if (elT) {
+        charts.top = new Chart(elT, {
+          type: 'bar',
+          data: {
+            labels: top.map(function(x){ return x[0].length > 18 ? x[0].slice(0,16)+'…' : x[0]; }),
+            datasets: [{ label: 'Qtd', data: top.map(function(x){ return x[1]; }), backgroundColor: '#8b5cf6' }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
+        });
+      }
 
-      document.getElementById('tabCat').innerHTML = `<thead><tr><th>Categoria</th><th>Produtos</th><th>Estado</th></tr></thead>
-        <tbody>${cats.map(c => {
-          const n = produtos.filter(p => p.categoria_id === c.id).length;
-          return `<tr><td>${esc(c.nome)}</td><td>${n}</td><td>${esc(c.estado)}</td></tr>`;
-        }).join('') || '<tr><td colspan="3">—</td></tr>'}</tbody>`;
-
-      document.getElementById('tabPed').innerHTML = `<thead><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>LODJA</th></tr></thead>
-        <tbody>${pedidos.slice(0,25).map(p => {
-          const sync = p.lodja_sync || localStorage.getItem('lv_sync_'+p.numero_pedido)==='ok';
-          return `<tr>
-          <td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td>
-          <td>${LojaDB.formatMT(p.total)}</td><td>${esc(p.estado)}</td>
-          <td>${p.lodja_cliente?'Cliente':'-'} ${sync?'· Compra':''}</td></tr>`;
-        }).join('') || '<tr><td colspan="5">—</td></tr>'}</tbody>`;
-
-      topMap = {};
-      pedidos.forEach(p => (p.itens || []).forEach(i => {
-        const k = i.nome || i.produtoId || '?';
-        topMap[k] = (topMap[k] || 0) + (i.quantidade || 1);
-      }));
-
-      buildCharts();
-      renderProdutosRel();
+      var catRev = {};
+      var prodById = {};
+      produtos.forEach(function(p){ prodById[p.id] = p; });
+      cats.forEach(function(c){ catRev[c.nome || c.id] = 0; });
+      pedidos.forEach(function(p) {
+        if ((p.estado || '').toLowerCase() === 'cancelado') return;
+        var itens = p.itens || [];
+        if (!itens.length) {
+          catRev['Geral'] = (catRev['Geral'] || 0) + (Number(p.total) || 0);
+          return;
+        }
+        itens.forEach(function(it) {
+          var prod = prodById[it.produtoId || it.produto_id];
+          var nome = 'Outros';
+          if (prod) {
+            var c = cats.find(function(x){ return x.id === prod.categoria_id; });
+            nome = c ? (c.nome || c.id) : 'Outros';
+          }
+          var unit = Number(it.preco_unitario != null ? it.preco_unitario : (it.preco != null ? it.preco : 0)) || 0;
+          var qty = Number(it.quantidade) || 1;
+          var line = Number(it.subtotal) || (unit * qty);
+          catRev[nome] = (catRev[nome] || 0) + line;
+        });
+      });
+      var catLabels = Object.keys(catRev).filter(function(k){ return catRev[k] > 0; });
+      var elC = document.getElementById('chartCats');
+      if (elC) {
+        charts.cats = new Chart(elC, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels.length ? catLabels : ['Sem vendas'],
+            datasets: [{ data: catLabels.length ? catLabels.map(function(k){ return catRev[k]; }) : [1],
+              backgroundColor: (catLabels.length?catLabels:['x']).map(function(_,i){ return colors[i % colors.length]; }) }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+      }
+      var tb = document.getElementById('tabCatRev');
+      if (tb) {
+        var rows = catLabels.map(function(k){ return [k, catRev[k]]; }).sort(function(a,b){ return b[1]-a[1]; });
+        tb.innerHTML = '<thead><tr><th>Categoria</th><th>Receita (MT)</th></tr></thead><tbody>' +
+          (rows.map(function(r){ return '<tr><td data-label="Categoria">'+esc(r[0])+'</td><td data-label="Receita">'+Number(r[1]).toLocaleString('pt-PT')+'</td></tr>'; }).join('') ||
+           '<tr><td colspan="2">Sem dados</td></tr>') + '</tbody>';
+      }
     }
 
-    function exportExcel() {
-      const wb = XLSX.utils.book_new();
-      const vendas = pedidos.filter(p => ['concluido','entregue','pago'].includes(p.estado))
-        .reduce((s,p) => s + (Number(p.total)||0), 0);
-      const s1 = [
-        ['Relatório LODJA Store', new Date().toLocaleString('pt-PT')],
-        [],
-        ['Métrica', 'Valor'],
-        ['Produtos', produtos.length],
-        ['Pedidos', pedidos.length],
-        ['Vendas (pago/entregue/concluído) MT', vendas],
-        [],
-        ['Categoria', 'Nº produtos'],
-        ...cats.map(c => [c.nome, produtos.filter(p=>p.categoria_id===c.id).length]),
-        [],
-        ['Produto (tendência)', 'Quantidade'],
-        ...Object.entries(topMap).sort((a,b)=>b[1]-a[1]).map(([n,q]) => [n,q]),
-        [],
-        ['Nº pedido', 'Cliente', 'Telefone', 'Total', 'Estado', 'Cliente LODJA', 'Data'],
-        ...pedidos.map(p => [p.numero_pedido, p.cliente_nome, p.cliente_telefone, p.total, p.estado, p.lodja_cliente?'sim':'não', p.data_criacao])
-      ];
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s1), 'Dashboard');
-      XLSX.writeFile(wb, 'relatorio-loja-' + Date.now() + '.xlsx');
+    function renderProdutosRel() {
+      var q = (document.getElementById('qProdRel').value || '').toLowerCase();
+      var fc = document.getElementById('fCatProdRel').value;
+      var list = produtos.slice();
+      if (q) list = list.filter(function(p){ return (p.nome||'').toLowerCase().includes(q) || (p.codigo||'').toLowerCase().includes(q); });
+      if (fc) list = list.filter(function(p){ return String(p.categoria_id||'') === String(fc); });
+      var catN = function(id){ var c = cats.find(function(x){ return x.id === id; }); return c ? ((c.icone||'')+' '+c.nome) : '—'; };
+      var el = document.getElementById('tabProdutosRel');
+      el.innerHTML = '<thead><tr><th>Produto</th><th>Código</th><th>Categoria</th><th>Preço</th><th>Estado</th></tr></thead><tbody>' +
+        (list.map(function(p){
+          return '<tr><td data-label="Produto">'+esc(p.nome)+'</td><td data-label="Código">'+esc(p.codigo||'—')+
+            '</td><td data-label="Categoria">'+esc(catN(p.categoria_id))+'</td><td data-label="Preço">'+LojaDB.formatMT(LojaDB.precoFinal(p))+
+            '</td><td data-label="Estado">'+(p.estado||'activo')+'</td></tr>';
+        }).join('') || '<tr><td colspan="5">Sem produtos</td></tr>') + '</tbody>';
     }
 
-    function docHtml() {
-      const top = Object.entries(topMap).sort((a,b)=>b[1]-a[1]).slice(0,10)
-        .map(([n,q]) => `<tr><td>${esc(n)}</td><td>${q}</td></tr>`).join('');
-      const vendas = pedidos.filter(p => ['concluido','entregue','pago'].includes(p.estado))
-        .reduce((s,p) => s + (Number(p.total)||0), 0);
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório</title>
-        <style>body{font-family:Arial,sans-serif;padding:24px;color:#111}
-        h1{font-size:20px} table{border-collapse:collapse;width:100%;margin:12px 0}
-        th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}
-        th{background:#f1f5f9}</style></head><body>
-        <h1>Relatório LODJA Store</h1>
-        <p>Gerado em ${new Date().toLocaleString('pt-PT')}</p>
-        <p><strong>Produtos:</strong> ${produtos.length} · <strong>Pedidos:</strong> ${pedidos.length} · <strong>Vendas MT:</strong> ${vendas}</p>
-        <h2>Tendências (top produtos)</h2>
-        <table><thead><tr><th>Produto</th><th>Qtd</th></tr></thead><tbody>${top}</tbody></table>
-        <h2>Pedidos</h2>
-        <table><thead><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th></tr></thead>
-        <tbody>${pedidos.slice(0,50).map(p=>`<tr><td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td>
-          <td>${p.total||0}</td><td>${esc(p.estado)}</td></tr>`).join('')}</tbody></table>
-        <script>
-    async function __refreshNtfBadge(){
+    function exportExcel(){
+      var rows = [['Nº','Cliente','Total','Estado','Data']].concat(
+        pedidos.map(function(p){ return [p.numero_pedido,p.cliente_nome,p.total,p.estado,p.data_criacao]; })
+      );
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Pedidos');
+      XLSX.writeFile(wb, 'relatorio-'+Date.now()+'.xlsx');
+    }
+    function exportPDF(){
+      var w = window.open('','_blank');
+      if (!w) return alert('Permita pop-ups');
+      var html = '<html><head><title>Relatório</title></head><body style="font-family:Arial;padding:20px">';
+      html += '<h1>Relatório LODJA Store</h1><p>'+new Date().toLocaleString('pt-PT')+'</p>';
+      html += '<p>Pedidos: '+pedidos.length+' · Produtos: '+produtos.length+'</p>';
+      html += '<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th></tr>';
+      pedidos.forEach(function(p){
+        html += '<tr><td>'+esc(p.numero_pedido)+'</td><td>'+esc(p.cliente_nome)+'</td><td>'+p.total+'</td><td>'+esc(p.estado)+'</td></tr>';
+      });
+      html += '</table></body></html>';
+      w.document.write(html);
+      w.document.close();
+      setTimeout(function(){ w.print(); }, 400);
+    }
+
+    async function refreshBadge(){
       try {
-        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
-        const n = await LojaDB.countNotificacoesNaoLidas();
-        const b = document.getElementById('ntfBadge');
+        var n = await LojaDB.countNotificacoesNaoLidas();
+        var b = document.getElementById('ntfBadge');
         if (!b) return;
         if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
         else b.style.display = 'none';
       } catch(e){}
     }
-    document.addEventListener('DOMContentLoaded', function(){
-      setTimeout(__refreshNtfBadge, 600);
-      setInterval(__refreshNtfBadge, 30000);
-    });
-</script>
-</body></html>`;
-    }
-    function exportPDF() {
-      const w = window.open('', '_blank');
-      w.document.write(docHtml());
-      w.document.close();
-      setTimeout(() => w.print(), 400);
-    }
-    function exportWord() {
-      const blob = new Blob(['\ufeff' + docHtml()], { type: 'application/msword' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'relatorio-loja-' + Date.now() + '.doc';
-      a.click();
+
+    async function load() {
+      produtos = await LojaDB.getProdutos({});
+      pedidosAll = await LojaDB.getPedidos();
+      cats = await LojaDB.getAllCategorias();
+
+      document.getElementById('fCatRel').innerHTML = '<option value="">Todas as categorias</option>' +
+        cats.map(function(c){ return '<option value="'+c.id+'">'+(c.icone||'')+' '+(c.nome||'')+'</option>'; }).join('');
+      document.getElementById('fCatProdRel').innerHTML = '<option value="">Todas categorias</option>' +
+        cats.map(function(c){ return '<option value="'+c.id+'">'+(c.icone||'')+' '+(c.nome||'')+'</option>'; }).join('');
+
+      pedidos = filtrarPedidosPeriodo(pedidosAll.slice());
+      var catFiltro = document.getElementById('fCatRel').value;
+      if (catFiltro) {
+        var prodIds = {};
+        produtos.filter(function(p){ return String(p.categoria_id||'') === String(catFiltro); }).forEach(function(p){ prodIds[p.id]=true; });
+        pedidos = pedidos.filter(function(p){
+          var itens = p.itens || [];
+          if (!itens.length) return false;
+          return itens.some(function(it){ return prodIds[it.produto_id || it.produtoId]; });
+        });
+      }
+
+      var pend = pedidos.filter(function(p){ return p.estado === 'pendente'; }).length;
+      var vendas = pedidos.filter(function(p){ return ['concluido','entregue','pago'].indexOf(p.estado) >= 0; })
+        .reduce(function(s,p){ return s + (Number(p.total)||0); }, 0);
+
+      document.getElementById('stats').innerHTML =
+        '<div class="stat-pro"><div class="top"><div class="ico" style="background:#dbeafe">📋</div><div class="l">Pedidos</div></div><div class="v">'+pedidos.length+'</div></div>' +
+        '<div class="stat-pro"><div class="top"><div class="ico" style="background:#dcfce7">⏱</div><div class="l">Pendentes</div></div><div class="v">'+pend+'</div></div>' +
+        '<div class="stat-pro"><div class="top"><div class="ico" style="background:#ffedd5">📦</div><div class="l">Produtos</div></div><div class="v">'+produtos.length+'</div></div>' +
+        '<div class="stat-pro"><div class="top"><div class="ico" style="background:#ede9fe">💰</div><div class="l">Vendas (MT)</div></div><div class="v">'+vendas.toLocaleString('pt-PT')+'</div></div>';
+
+      topMap = {};
+      pedidos.forEach(function(p){
+        (p.itens||[]).forEach(function(i){
+          var k = i.nome || i.nome_produto || 'Item';
+          topMap[k] = (topMap[k] || 0) + (Number(i.quantidade)||1);
+        });
+      });
+
+      buildCharts();
+      renderProdutosRel();
+      await refreshBadge();
     }
 
-    load();
+    (async function(){
+      initSupabase();
+      await LojaDB.init();
+      await load();
+      setInterval(refreshBadge, 30000);
+    })();
   </script>
 </body>
 </html>

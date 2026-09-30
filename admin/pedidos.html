@@ -22,9 +22,7 @@
       </div>
       <div class="adm-top-actions">
         <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
-        
         <a class="adm-icon-btn" href="index.html">🏠</a>
-        <button type="button" class="adm-icon-btn" onclick="if(confirm('Sair?'))AdminAuth.logout()">👤</button>
       </div>
     </div>
   </header>
@@ -32,7 +30,6 @@
   <div class="adm-drawer" id="drawer">
     <div class="scrim" onclick="toggleMenu()"></div>
     <div class="panel">
-      <div style="font-weight:800;padding:8px 12px 16px">LODJA Admin</div>
       <a href="index.html">📊 Dashboard</a>
       <a href="produtos.html">👕 Produtos</a>
       <a href="categorias.html">📂 Categorias</a>
@@ -212,12 +209,12 @@
       const dt = new Date(d);
       const mins = dt.getHours()*60 + dt.getMinutes();
       if (hi) {
-        const [h,m] = hi.split(':').map(Number);
-        if (mins < h*60+m) return false;
+        const parts = hi.split(':').map(Number);
+        if (mins < parts[0]*60+parts[1]) return false;
       }
       if (hf) {
-        const [h,m] = hf.split(':').map(Number);
-        if (mins > h*60+m) return false;
+        const parts = hf.split(':').map(Number);
+        if (mins > parts[0]*60+parts[1]) return false;
       }
       return true;
     }
@@ -237,7 +234,7 @@
         if (!inHour(p.data_criacao)) return false;
         return true;
       });
-      list.sort((a,b) => {
+      list.sort(function(a,b) {
         if (ordem === 'asc') return new Date(a.data_criacao||0) - new Date(b.data_criacao||0);
         if (ordem === 'valor_desc') return (Number(b.total)||0) - (Number(a.total)||0);
         if (ordem === 'valor_asc') return (Number(a.total)||0) - (Number(b.total)||0);
@@ -259,7 +256,7 @@
         const p = await LojaDB.actualizarEstadoPedido(id, estado);
         if (SYNC_ESTADOS.includes(estado)) {
           const settings = await LojaDB.getSettings();
-          const r = await LodjaBridge.sincronizarCompra(p, { ...settings, syncComprasLodja: true, syncClientesLodja: true });
+          const r = await LodjaBridge.sincronizarCompra(p, Object.assign({}, settings, { syncComprasLodja: true, syncClientesLodja: true }));
           if (r && r.ok) {
             alert(r.duplicado
               ? 'Actualizado. Compra já existia no LODJA (factura '+(r.factura||'')+').'
@@ -275,7 +272,7 @@
         if (!p) return alert('Pedido não encontrado');
         await LojaDB.marcarClienteLodja(id, true);
         const settings = await LojaDB.getSettings();
-        const r = await LodjaBridge.sincronizarCompra({ ...p, lodja_cliente: true }, { ...settings, syncComprasLodja: true, syncClientesLodja: true });
+        const r = await LodjaBridge.sincronizarCompra(Object.assign({}, p, { lodja_cliente: true }), Object.assign({}, settings, { syncComprasLodja: true, syncClientesLodja: true }));
         if (r && r.ok) alert(r.duplicado ? 'Já no LODJA (factura '+(r.factura||'')+').' : 'Sincronizado · Factura '+(r.factura||''));
         else alert('Falha: '+((r&&r.erro)||'desconhecida'));
         await load();
@@ -284,43 +281,45 @@
 
     function render() {
       const list = filtered();
-      document.getElementById('lista').innerHTML = list.map(p => {
-        const itens = (p.itens||[]).map(i => (i.quantidade||1)+'× '+esc(i.nome||i.nome_produto)).join(', ') || '—';
+      document.getElementById('lista').innerHTML = list.map(function(p) {
+        const itens = (p.itens||[]).map(function(i){ return (i.quantidade||1)+'× '+esc(i.nome||i.nome_produto); }).join(', ') || '—';
         const syncOk = p.lodja_sync || localStorage.getItem('lv_sync_'+p.numero_pedido)==='ok';
         const fact = localStorage.getItem('lv_sync_fact_'+p.numero_pedido)||'';
-        return `<article class="adm-card">
-          <div style="display:flex;gap:10px;align-items:flex-start">
-            <div class="bar ${barCls(p.estado)}" style="width:4px;min-height:48px;border-radius:4px;background:${barCls(p.estado)==='warn'?'#f59e0b':barCls(p.estado)==='muted'?'#94a3b8':'#22c55e'}"></div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
-                <strong style="font-size:15px">${esc(p.numero_pedido)}</strong>
-                <span class="adm-badge ${badgeCls(p.estado)}">${esc(p.estado)}</span>
-              </div>
-              <div class="meta" style="margin-top:4px">👤 ${esc(p.cliente_nome)} · 📞 ${esc(p.cliente_telefone)}</div>
-              <div class="meta">${p.data_criacao?new Date(p.data_criacao).toLocaleString('pt-PT'):'—'} · <strong>${LojaDB.formatMT(p.total)}</strong></div>
-              <div style="font-size:12px;margin-top:6px;color:var(--adm-muted)">${itens}</div>
-              <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-                <label style="font-size:12px;display:inline-flex;gap:6px;align-items:center">
-                  <input type="checkbox" ${p.lodja_cliente?'checked':''} onchange="tornarCliente('${p.id}', this.checked)"> Cliente LODJA
-                </label>
-                <span class="meta">${syncOk?'✓ LODJA'+(fact?' · Fact. '+fact:''):'○ Sem compra LODJA'}</span>
-              </div>
-              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
-                <select class="adm-select" style="flex:1;min-width:140px" onchange="mudar('${p.id}', this.value)">
-                  ${ESTADOS.map(e=>`<option value="${e}" ${e===p.estado?'selected':''}>${e}</option>`).join('')}
-                </select>
-                <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="syncManual('${p.id}')">↗ LODJA</button>
-              </div>
-            </div>
-          </div>
-        </article>`;
+        const barBg = barCls(p.estado)==='warn'?'#f59e0b':(barCls(p.estado)==='muted'?'#94a3b8':'#22c55e');
+        return '<article class="adm-card">' +
+          '<div style="display:flex;gap:10px;align-items:flex-start">' +
+            '<div class="bar" style="width:4px;min-height:48px;border-radius:4px;background:'+barBg+'"></div>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">' +
+                '<strong style="font-size:15px">'+esc(p.numero_pedido)+'</strong>' +
+                '<span class="adm-badge '+badgeCls(p.estado)+'">'+esc(p.estado)+'</span>' +
+              '</div>' +
+              '<div class="meta" style="margin-top:4px">👤 '+esc(p.cliente_nome)+' · 📞 '+esc(p.cliente_telefone)+'</div>' +
+              '<div class="meta">'+(p.data_criacao?new Date(p.data_criacao).toLocaleString('pt-PT'):'—')+' · <strong>'+LojaDB.formatMT(p.total)+'</strong></div>' +
+              '<div style="font-size:12px;margin-top:6px;color:var(--adm-muted)">'+itens+'</div>' +
+              '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+                '<label style="font-size:12px;display:inline-flex;gap:6px;align-items:center">' +
+                  '<input type="checkbox" '+(p.lodja_cliente?'checked':'')+' onchange="tornarCliente(\''+p.id+'\', this.checked)"> Cliente LODJA' +
+                '</label>' +
+                '<span class="meta">'+(syncOk?'✓ LODJA'+(fact?' · Fact. '+fact:''):'○ Sem compra LODJA')+'</span>' +
+              '</div>' +
+              '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">' +
+                '<select class="adm-select" style="flex:1;min-width:140px" onchange="mudar(\''+p.id+'\', this.value)">' +
+                  ESTADOS.map(function(e){ return '<option value="'+e+'" '+(e===p.estado?'selected':'')+'>'+e+'</option>'; }).join('') +
+                '</select>' +
+                '<button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="syncManual(\''+p.id+'\')">↗ LODJA</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</article>';
       }).join('') || '<p style="text-align:center;color:var(--adm-muted);padding:24px">Nenhum pedido com estes filtros</p>';
     }
 
     function exportExcel(){
       const list = filtered();
-      const rows = [['Nº','Cliente','Telefone','Total','Estado','Data'],
-        ...list.map(p=>[p.numero_pedido,p.cliente_nome,p.cliente_telefone,p.total,p.estado,p.data_criacao])];
+      const rows = [['Nº','Cliente','Telefone','Total','Estado','Data']].concat(
+        list.map(function(p){ return [p.numero_pedido,p.cliente_nome,p.cliente_telefone,p.total,p.estado,p.data_criacao]; })
+      );
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Pedidos');
       XLSX.writeFile(wb, 'pedidos-'+Date.now()+'.xlsx');
@@ -328,32 +327,31 @@
     function exportPDF(){
       const list = filtered();
       const w = window.open('','_blank');
-      w.document.write(`<html><head><title>Pedidos</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;font-size:12px}</style></head><body>
-        <h1>Pedidos</h1><p>${new Date().toLocaleString('pt-PT')}</p>
-        <table><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Data</th></tr>
-        ${list.map(p=>`<tr><td>${esc(p.numero_pedido)}</td><td>${esc(p.cliente_nome)}</td><td>${p.total}</td><td>${esc(p.estado)}</td><td>${esc(p.data_criacao)}</td></tr>`).join('')}
-        </table><script>
-    async function __refreshNtfBadge(){
+      if (!w) return alert('Permita pop-ups para exportar PDF');
+      var html = '<html><head><title>Pedidos</title><style>body{font-family:Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;font-size:12px}</style></head><body>';
+      html += '<h1>Pedidos</h1><p>'+new Date().toLocaleString('pt-PT')+'</p>';
+      html += '<table><tr><th>Nº</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Data</th></tr>';
+      list.forEach(function(p){
+        html += '<tr><td>'+esc(p.numero_pedido)+'</td><td>'+esc(p.cliente_nome)+'</td><td>'+p.total+'</td><td>'+esc(p.estado)+'</td><td>'+esc(p.data_criacao)+'</td></tr>';
+      });
+      html += '</table></body></html>';
+      w.document.write(html);
+      w.document.close();
+      setTimeout(function(){ w.print(); }, 400);
+    }
+
+    async function refreshBadge(){
       try {
-        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
-        const n = await LojaDB.countNotificacoesNaoLidas();
-        const b = document.getElementById('ntfBadge');
+        var n = await LojaDB.countNotificacoesNaoLidas();
+        var b = document.getElementById('ntfBadge');
         if (!b) return;
         if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
         else b.style.display = 'none';
       } catch(e){}
     }
-    document.addEventListener('DOMContentLoaded', function(){
-      setTimeout(__refreshNtfBadge, 600);
-      setInterval(__refreshNtfBadge, 30000);
-    });
-</script>
-</body></html>`);
-      w.document.close(); setTimeout(()=>w.print(), 400);
-    }
 
-    async function load(){ todos = await LojaDB.getPedidos(); render(); }
-    (async () => { initSupabase(); await LojaDB.init(); await load(); })();
+    async function load(){ todos = await LojaDB.getPedidos(); render(); await refreshBadge(); }
+    (async function(){ initSupabase(); await LojaDB.init(); await load(); setInterval(refreshBadge, 30000); })();
   </script>
 </body>
 </html>

@@ -282,21 +282,23 @@
       } catch (e) {}
     })();
   </script>
+
 <script>
-    async function __refreshNtfBadge(){
-      try {
-        if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
-        const n = await LojaDB.countNotificacoesNaoLidas();
-        const b = document.getElementById('ntfBadge');
-        if (!b) return;
-        if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
-        else b.style.display = 'none';
-      } catch(e){}
-    }
-    document.addEventListener('DOMContentLoaded', function(){
-      setTimeout(__refreshNtfBadge, 600);
-      setInterval(__refreshNtfBadge, 30000);
-    });
+(function(){
+  async function refreshBadge(){
+    try {
+      if (typeof LojaDB === 'undefined' || !LojaDB.countNotificacoesNaoLidas) return;
+      var n = await LojaDB.countNotificacoesNaoLidas();
+      var b = document.getElementById('ntfBadge');
+      if (!b) return;
+      if (n > 0) { b.style.display = 'grid'; b.textContent = n > 99 ? '99+' : String(n); }
+      else b.style.display = 'none';
+    } catch(e){}
+  }
+  setTimeout(refreshBadge, 800);
+  setInterval(refreshBadge, 30000);
+})();
 </script>
+
 </body>
 </html>
