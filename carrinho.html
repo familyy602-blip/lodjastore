@@ -215,21 +215,45 @@ button, input, select, textarea { font: inherit; }
   font-weight: 800; white-space: nowrap; font-size: 15px; flex-shrink: 0;
 }
 .cart-item .qty-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  width: 100%;
 }
 .cart-item .qty-row button {
-  min-width: 36px; height: 36px; border-radius: 10px;
-  border: 1px solid var(--border); background: #fff; font-weight: 700;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 .cart-item .qty-row .btn-remove {
-  margin-left: auto;
-  padding: 8px 12px;
-  font-size: 12px;
+  flex: 1 1 100%;
+  margin-left: 0;
+  margin-top: 4px;
+  min-height: 40px;
+  height: auto;
+  padding: 10px 14px;
+  font-size: 13px;
   border-radius: 10px;
   border: 1px solid #fecaca;
   background: #fef2f2;
   color: #b91c1c;
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: center;
+}
+@media (min-width: 420px) {
+  .cart-item .qty-row .btn-remove {
+    flex: 0 0 auto;
+    margin-left: auto;
+    margin-top: 0;
+    min-width: 96px;
+  }
 }
 @media (min-width: 640px) {
   .cart-item { grid-template-columns: 88px 1fr; }
@@ -523,36 +547,62 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script src="/lodjastore/js/cart.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
-    async function cartQty(i, q){ await Cart.updateQty(i, q); await render(); }
-    async function cartRem(i){ await Cart.remove(i); await render(); }
+    let _promosCache = null;
+    let _imgMem = {};
+
+    async function cartQty(i, q) {
+      // UI imediata — sync Supabase em background
+      await Cart.updateQty(i, q);
+      renderFast();
+    }
+    async function cartRem(i) {
+      await Cart.remove(i);
+      renderFast();
+    }
+
     async function resolveImagens(items) {
+      const logo = (location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '') + 'logo-lodja.png';
       const out = [];
       for (const it of items) {
-        let img = it.imagem || '';
-        if (!img || img.indexOf('data:') === 0) {
+        const key = String(it.produtoId);
+        let img = _imgMem[key] || it.imagem || '';
+        if ((!img || img.indexOf('data:') === 0) && !_imgMem[key]) {
           try {
             const p = await LojaDB.getProduto(it.produtoId);
             if (p) img = LojaDB.imgPrincipal(p) || '';
-            // se ainda for base64 grande, ok para mostrar (só leitura)
+            if (img) _imgMem[key] = img;
           } catch (e) {}
         }
-        if (!img) {
-          img = (location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '') + 'logo-lodja.png';
-        }
+        if (!img) img = logo;
         out.push(Object.assign({}, it, { _img: img }));
       }
       return out;
     }
 
-    async function render() {
-      await Cart.load();
-      let items = Cart.get();
-      items = await resolveImagens(items);
-      const promos = await LojaDB.getPromocoesActivas();
+    function renderFast() {
+      // render síncrono a partir do cache (sem await load)
+      const items = Cart.get();
+      paint(items.map(it => {
+        const key = String(it.produtoId);
+        const logo = (location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '') + 'logo-lodja.png';
+        const img = _imgMem[key] || it.imagem || logo;
+        return Object.assign({}, it, { _img: img });
+      }));
+      // resolve imagens em falta em background
+      resolveImagens(items).then(full => {
+        if (full.some((x, i) => x._img !== (items[i] && (_imgMem[String(items[i].produtoId)] || items[i].imagem)))) {
+          paint(full);
+        } else paint(full);
+      }).catch(() => {});
+    }
+
+    function paint(items) {
+      const promos = _promosCache || [];
       const calc = LojaDB.calcularDesconto(items, promos);
       if (!items.length) {
         document.getElementById('lista').innerHTML = '<p class="empty">Carrinho vazio</p>';
         document.getElementById('resumo').innerHTML = '';
+        Cart.updateBadge();
         return;
       }
       document.getElementById('lista').innerHTML = items.map((it, i) => `
@@ -579,6 +629,17 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         <div class="line"><span>Desconto${calc.promoAplicada ? ' ('+calc.promoAplicada.nome+')' : ''}</span><span>− ${LojaDB.formatMT(calc.desconto)}</span></div>
         <div class="line total"><span>Total</span><span>${LojaDB.formatMT(calc.total)}</span></div>
         <a class="btn btn-primary btn-block" style="margin-top:14px" href="checkout.html">Solicitar pedido</a>`;
+      Cart.updateBadge();
+    }
+
+    async function render() {
+      await Cart.load();
+      let items = Cart.get();
+      if (!_promosCache) {
+        try { _promosCache = await LojaDB.getPromocoesActivas(); } catch (e) { _promosCache = []; }
+      }
+      items = await resolveImagens(items);
+      paint(items);
     }
     (async () => { initSupabase(); await LojaDB.init();
       await Cart.load(); render(); })();

@@ -1,11 +1,12 @@
 /**
- * Carrinho na base de dados Supabase (tabela lv_carrinho).
- * O device_id só identifica o browser; os itens ficam na cloud.
+ * Carrinho Supabase com actualização optimista (UI rápida).
+ * Cache em memória + sync em segundo plano à base de dados.
  */
 const Cart = {
   KEY_DEVICE: 'lv_device_id',
   _cache: [],
-  _ready: null,
+  _loading: null,
+  _imgCache: {},
 
   deviceId() {
     let id = localStorage.getItem(this.KEY_DEVICE);
@@ -33,44 +34,54 @@ const Cart = {
     return null;
   },
 
-  async load() {
-    const db = await this._remote();
-    const device = this.deviceId();
-    if (db) {
-      try {
-        const { data, error } = await db
-          .from('lv_carrinho')
-          .select('*')
-          .eq('device_id', device)
-          .order('data_atualizacao', { ascending: false });
-        if (error) throw error;
-        this._cache = (data || []).map(r => ({
-          id: r.id,
-          produtoId: r.produto_id,
-          nome: r.nome,
-          imagem: r.imagem || '',
-          tamanho: r.tamanho || '',
-          cor: r.cor || '',
-          preco: Number(r.preco) || 0,
-          quantidade: Number(r.quantidade) || 1,
-          variacaoId: r.variacao_id || null
-        }));
-        // migrar carrinho antigo local (uma vez)
-        await this._migrateLocalIfAny(db, device);
-        this.updateBadge();
-        return this._cache;
-      } catch (e) {
-        console.warn('Carrinho remoto', e);
+  _mapRows(data) {
+    return (data || []).map(r => ({
+      id: r.id,
+      produtoId: r.produto_id,
+      nome: r.nome,
+      imagem: r.imagem || '',
+      tamanho: r.tamanho || '',
+      cor: r.cor || '',
+      preco: Number(r.preco) || 0,
+      quantidade: Number(r.quantidade) || 1,
+      variacaoId: r.variacao_id || null
+    }));
+  },
+
+  async load(force) {
+    if (this._loading && !force) return this._loading;
+    this._loading = (async () => {
+      const db = await this._remote();
+      const device = this.deviceId();
+      if (db) {
+        try {
+          const { data, error } = await db
+            .from('lv_carrinho')
+            .select('*')
+            .eq('device_id', device)
+            .order('data_atualizacao', { ascending: false });
+          if (error) throw error;
+          this._cache = this._mapRows(data);
+          await this._migrateLocalIfAny(db, device);
+          this.updateBadge();
+          return this._cache;
+        } catch (e) {
+          console.warn('Carrinho remoto', e);
+        }
       }
-    }
-    // fallback temporário só se Supabase/tabela indisponível
+      try {
+        this._cache = JSON.parse(localStorage.getItem('lv_carrinho') || '[]');
+      } catch (e) {
+        this._cache = [];
+      }
+      this.updateBadge();
+      return this._cache;
+    })();
     try {
-      this._cache = JSON.parse(localStorage.getItem('lv_carrinho') || '[]');
-    } catch (e) {
-      this._cache = [];
+      return await this._loading;
+    } finally {
+      this._loading = null;
     }
-    this.updateBadge();
-    return this._cache;
   },
 
   async _migrateLocalIfAny(db, device) {
@@ -101,22 +112,16 @@ const Cart = {
     localStorage.removeItem('lv_carrinho');
     localStorage.setItem('lv_cart_migrated', '1');
     const { data } = await db.from('lv_carrinho').select('*').eq('device_id', device);
-    this._cache = (data || []).map(r => ({
-      id: r.id,
-      produtoId: r.produto_id,
-      nome: r.nome,
-      imagem: r.imagem || '',
-      tamanho: r.tamanho || '',
-      cor: r.cor || '',
-      preco: Number(r.preco) || 0,
-      quantidade: Number(r.quantidade) || 1,
-      variacaoId: r.variacao_id || null
-    }));
+    this._cache = this._mapRows(data);
   },
 
-  /** Síncrono: devolve cache (chamar load() antes nas páginas) */
   get() {
     return this._cache.slice();
+  },
+
+  /** Sync em background — não bloqueia a UI */
+  _bg(fn) {
+    Promise.resolve().then(fn).catch(e => console.warn('cart sync', e));
   },
 
   async add(item) {
@@ -124,62 +129,42 @@ const Cart = {
       alert('Produto inválido para o carrinho.');
       return this.get();
     }
-    await this.load();
+    if (!this._cache.length) await this.load();
     const device = this.deviceId();
-    const db = await this._remote();
-    const keyMatch = (i) =>
-      String(i.produtoId) === String(item.produtoId) &&
-      (i.tamanho || '') === (item.tamanho || '') &&
-      (i.cor || '') === (item.cor || '');
-
-    const existing = this._cache.find(keyMatch);
     const qtyAdd = Math.max(1, Number(item.quantidade) || 1);
     let img = '';
     if (item.imagem && String(item.imagem).indexOf('data:') !== 0 && String(item.imagem).length < 400) {
       img = String(item.imagem);
     }
+    const existing = this._cache.find(i =>
+      String(i.produtoId) === String(item.produtoId) &&
+      (i.tamanho || '') === (item.tamanho || '') &&
+      (i.cor || '') === (item.cor || '')
+    );
 
-    if (db) {
-      try {
-        if (existing && existing.id) {
-          const novaQty = (Number(existing.quantidade) || 0) + qtyAdd;
-          const { error } = await db.from('lv_carrinho').update({
-            quantidade: novaQty,
-            preco: Number(item.preco) || existing.preco || 0,
-            nome: item.nome || existing.nome,
-            data_atualizacao: new Date().toISOString()
-          }).eq('id', existing.id);
-          if (error) throw error;
-        } else {
-          const row = {
-            id: 'cart_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
-            device_id: device,
-            produto_id: String(item.produtoId),
-            nome: item.nome || 'Produto',
-            imagem: img,
-            tamanho: item.tamanho || '',
-            cor: item.cor || '',
-            preco: Number(item.preco) || 0,
-            quantidade: qtyAdd,
-            variacao_id: item.variacaoId || null,
-            data_atualizacao: new Date().toISOString()
-          };
-          const { error } = await db.from('lv_carrinho').insert(row);
-          if (error) throw error;
-        }
-        await this.load();
-        return this.get();
-      } catch (e) {
-        console.error('Cart.add remoto', e);
-        alert('Não foi possível gravar no carrinho (base de dados). Execute o SQL da tabela lv_carrinho no Supabase.\n' + (e.message || e));
-        return this.get();
-      }
+    if (existing) {
+      existing.quantidade = (Number(existing.quantidade) || 0) + qtyAdd;
+      if (item.nome) existing.nome = item.nome;
+      if (item.preco != null) existing.preco = Number(item.preco) || existing.preco;
+      this.updateBadge();
+      const id = existing.id;
+      const qty = existing.quantidade;
+      this._bg(async () => {
+        const db = await this._remote();
+        if (!db || !id || String(id).indexOf('local_') === 0) return;
+        await db.from('lv_carrinho').update({
+          quantidade: qty,
+          preco: existing.preco,
+          nome: existing.nome,
+          data_atualizacao: new Date().toISOString()
+        }).eq('id', id);
+      });
+      return this.get();
     }
 
-    // Fallback local se tabela ainda não existir
-    if (existing) existing.quantidade = (Number(existing.quantidade) || 0) + qtyAdd;
-    else this._cache.push({
-      id: 'local_' + Date.now(),
+    const rowId = 'cart_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    const localItem = {
+      id: rowId,
       produtoId: item.produtoId,
       nome: item.nome || 'Produto',
       imagem: img,
@@ -188,70 +173,87 @@ const Cart = {
       preco: Number(item.preco) || 0,
       quantidade: qtyAdd,
       variacaoId: item.variacaoId || null
-    });
-    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+    };
+    this._cache.unshift(localItem);
     this.updateBadge();
+
+    this._bg(async () => {
+      const db = await this._remote();
+      if (!db) {
+        try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+        return;
+      }
+      const { error } = await db.from('lv_carrinho').insert({
+        id: rowId,
+        device_id: device,
+        produto_id: String(item.produtoId),
+        nome: localItem.nome,
+        imagem: img,
+        tamanho: localItem.tamanho,
+        cor: localItem.cor,
+        preco: localItem.preco,
+        quantidade: qtyAdd,
+        variacao_id: localItem.variacaoId,
+        data_atualizacao: new Date().toISOString()
+      });
+      if (error) console.warn('insert cart', error);
+    });
     return this.get();
   },
 
   async updateQty(index, qty) {
-    await this.load();
     const it = this._cache[index];
     if (!it) return this.get();
-    const db = await this._remote();
     if (qty <= 0) return this.remove(index);
 
-    if (db && it.id && String(it.id).indexOf('local_') !== 0) {
-      try {
+    // Optimista
+    it.quantidade = qty;
+    this.updateBadge();
+    const id = it.id;
+
+    this._bg(async () => {
+      const db = await this._remote();
+      if (db && id && String(id).indexOf('local_') !== 0) {
         await db.from('lv_carrinho').update({
           quantidade: qty,
           data_atualizacao: new Date().toISOString()
-        }).eq('id', it.id);
-        await this.load();
-        return this.get();
-      } catch (e) {
-        console.warn(e);
+        }).eq('id', id);
+      } else {
+        try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
       }
-    }
-    it.quantidade = qty;
-    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
-    this.updateBadge();
+    });
     return this.get();
   },
 
   async remove(index) {
-    await this.load();
     const it = this._cache[index];
     if (!it) return this.get();
-    const db = await this._remote();
-    if (db && it.id && String(it.id).indexOf('local_') !== 0) {
-      try {
-        await db.from('lv_carrinho').delete().eq('id', it.id);
-        await this.load();
-        return this.get();
-      } catch (e) {
-        console.warn(e);
-      }
-    }
+    const id = it.id;
     this._cache.splice(index, 1);
-    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
     this.updateBadge();
+
+    this._bg(async () => {
+      const db = await this._remote();
+      if (db && id && String(id).indexOf('local_') !== 0) {
+        await db.from('lv_carrinho').delete().eq('id', id);
+      } else {
+        try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
+      }
+    });
     return this.get();
   },
 
   async clear() {
-    const db = await this._remote();
     const device = this.deviceId();
-    if (db) {
-      try {
-        await db.from('lv_carrinho').delete().eq('device_id', device);
-      } catch (e) {
-        console.warn(e);
-      }
-    }
     this._cache = [];
-    try { localStorage.removeItem('lv_carrinho'); } catch (e) {}
     this.updateBadge();
+    this._bg(async () => {
+      const db = await this._remote();
+      if (db) {
+        try { await db.from('lv_carrinho').delete().eq('device_id', device); } catch (e) {}
+      }
+      try { localStorage.removeItem('lv_carrinho'); } catch (e) {}
+    });
     return [];
   },
 
@@ -274,7 +276,5 @@ const Cart = {
 
 window.Cart = Cart;
 document.addEventListener('DOMContentLoaded', () => {
-  if (typeof Cart !== 'undefined' && Cart.load) {
-    Cart.load().catch(() => {});
-  }
+  if (Cart.load) Cart.load().catch(() => {});
 });
