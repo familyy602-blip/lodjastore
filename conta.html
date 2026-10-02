@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>A minha conta — LODJA Store</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
+  <style>
+    .auth-card {
+      max-width: 420px; margin: 24px auto; background: #fff; border: 1px solid var(--border);
+      border-radius: 18px; padding: 24px; box-shadow: 0 10px 30px rgba(15,23,42,.06);
+    }
+    .auth-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .auth-tabs button {
+      flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--border);
+      background: #f8fafc; font-weight: 700; cursor: pointer;
+    }
+    .auth-tabs button.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .perf-stat { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+    .perf-stat div { background: #f8fafc; border-radius: 12px; padding: 12px; text-align: center; }
+    .perf-stat strong { display: block; font-size: 1.3rem; color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">
+        <img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" id="brandLogo">
+        <span id="brandName">LODJA Store</span>
+      </a>
+      <nav class="nav-links">
+        <a href="index.html">Início</a>
+        <a href="catalogo.html">Catálogo</a>
+        <a href="pedidos.html">Meus pedidos</a>
+        <a href="conta.html" class="active">Conta</a>
+        <a href="admin/login.html">Admin</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container" style="margin:20px auto 80px">
+    <div class="auth-card" id="boxAuth">
+      <div class="auth-tabs">
+        <button type="button" class="active" id="tabLogin" onclick="showTab('login')">Entrar</button>
+        <button type="button" id="tabReg" onclick="showTab('reg')">Criar conta</button>
+      </div>
+      <div id="paneLogin">
+        <h2 style="margin:0 0 12px">Entrar</h2>
+        <div class="form-group"><label>Email</label><input class="form-control" id="lEmail" type="email" autocomplete="email"></div>
+        <div class="form-group"><label>Palavra-passe</label><input class="form-control" id="lPass" type="password" autocomplete="current-password"></div>
+        <button type="button" class="btn btn-primary btn-block" onclick="doLogin()">Entrar</button>
+      </div>
+      <div id="paneReg" style="display:none">
+        <h2 style="margin:0 0 12px">Criar conta</h2>
+        <div class="form-group"><label>Nome</label><input class="form-control" id="rNome" autocomplete="name"></div>
+        <div class="form-group"><label>Email *</label><input class="form-control" id="rEmail" type="email" autocomplete="email"></div>
+        <div class="form-group"><label>Telefone / WhatsApp</label><input class="form-control" id="rTel" inputmode="tel"></div>
+        <div class="form-group"><label>Palavra-passe *</label><input class="form-control" id="rPass" type="password" autocomplete="new-password"></div>
+        <button type="button" class="btn btn-primary btn-block" onclick="doReg()">Registar</button>
+      </div>
+      <p style="margin-top:16px;font-size:13px;color:#64748b;text-align:center">
+        É administrador? <a href="admin/login.html">Entrar no painel</a>
+      </p>
+    </div>
+    <div class="auth-card" id="boxDash" style="display:none">
+      <h2 style="margin:0 0 6px">Olá, <span id="cNome">—</span></h2>
+      <p style="color:#64748b;font-size:14px;margin:0" id="cEmail"></p>
+      <div class="perf-stat">
+        <div><strong id="pNum">0</strong>Pedidos</div>
+        <div><strong id="pTot">0 MT</strong>Total gasto</div>
+      </div>
+      <h3 style="margin:12px 0 8px;font-size:15px">Últimos pedidos</h3>
+      <div id="pList"></div>
+      <div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px">
+        <a class="btn btn-primary" href="pedidos.html">Ver pedidos</a>
+        <a class="btn btn-outline" href="catalogo.html">Continuar a comprar</a>
+        <button type="button" class="btn btn-outline" onclick="doLogout()">Sair da conta</button>
+      </div>
+    </div>
+  </main>
+  <nav class="bottom-nav">
+    <a href="index.html"><span class="ico">🏠</span>Início</a>
+    <a href="catalogo.html"><span class="ico">▦</span>Catálogo</a>
+    <a href="carrinho.html"><span class="ico">🛒</span>Carrinho</a>
+    <a href="conta.html" class="active"><span class="ico">👤</span>Conta</a>
+  </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/analytics.js"></script>
+  <script>
+    function showTab(t) {
+      document.getElementById('paneLogin').style.display = t === 'login' ? '' : 'none';
+      document.getElementById('paneReg').style.display = t === 'reg' ? '' : 'none';
+      document.getElementById('tabLogin').classList.toggle('active', t === 'login');
+      document.getElementById('tabReg').classList.toggle('active', t === 'reg');
+    }
+    async function showDash(sess) {
+      document.getElementById('boxAuth').style.display = 'none';
+      document.getElementById('boxDash').style.display = '';
+      document.getElementById('cNome').textContent = sess.nome || 'Cliente';
+      document.getElementById('cEmail').textContent = sess.email || '';
+      const d = await LojaDB.getDesempenhoCliente(sess.id, sess.email);
+      document.getElementById('pNum').textContent = d.numPedidos;
+      document.getElementById('pTot').textContent = LojaDB.formatMT(d.totalGasto);
+      document.getElementById('pList').innerHTML = (d.pedidos || []).slice(0, 5).map(p =>
+        `<div style="padding:10px 0;border-bottom:1px solid #e2e8f0;font-size:14px">
+          <strong>${p.numero_pedido || p.id}</strong> · ${LojaDB.formatMT(p.total)} · ${p.estado || ''}
+        </div>`
+      ).join('') || '<p style="color:#64748b">Ainda sem pedidos.</p>';
+    }
+    async function doLogin() {
+      try {
+        const sess = await LojaDB.loginClienteConta(
+          document.getElementById('lEmail').value,
+          document.getElementById('lPass').value
+        );
+        await showDash(sess);
+      } catch (e) { alert(e.message || e); }
+    }
+    async function doReg() {
+      try {
+        const sess = await LojaDB.registarClienteConta({
+          nome: document.getElementById('rNome').value,
+          email: document.getElementById('rEmail').value,
+          telefone: document.getElementById('rTel').value,
+          password: document.getElementById('rPass').value
+        });
+        alert('Conta criada com sucesso!');
+        await showDash({ id: sess.id, email: sess.email, nome: sess.nome, telefone: sess.telefone });
+      } catch (e) { alert(e.message || e); }
+    }
+    function doLogout() {
+      LojaDB.logoutCliente();
+      location.reload();
+    }
+    (async () => {
+      initSupabase();
+      await LojaDB.init();
+      try {
+        const s = await LojaDB.getSettings();
+        LojaDB.applyBranding(s);
+      } catch (e) {}
+      const sess = LojaDB.getClienteSessao();
+      if (sess) await showDash(sess);
+    })();
+  </script>
+</body>
+</html>

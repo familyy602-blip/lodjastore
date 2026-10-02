@@ -467,7 +467,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       <a href="index.html" class="active">🏠 Início</a>
       <a href="catalogo.html">▦ Catálogo</a>
       <a href="pedidos.html">📦 Meus pedidos</a>
-      <a href="admin/login.html">👤 Admin</a>
+      <a href="conta.html">👤 Conta</a>
     </nav>
   </div>
 
@@ -540,6 +540,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script src="/lodjastore/js/supabase-config.js"></script>
   <script src="/lodjastore/js/cart.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/analytics.js"></script>
   <script src="/lodjastore/js/lodja-bridge.js"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
@@ -599,13 +600,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
 
       try {
         const settings = await LojaDB.getSettings();
-        if (settings.siteName) {
-          document.getElementById('brandName').textContent = settings.siteName;
-          document.getElementById('footerName').textContent = settings.siteName;
-          document.title = settings.siteName;
-        }
-        if (settings.logoUrl) document.getElementById('brandLogo').src = settings.logoUrl;
-      } catch (e) {}
+        LojaDB.applyBranding(settings);
+      } catch (e) { console.warn('branding', e); }
 
       // Promoção em destaque = Bónus Especial do LODJA v1
       try {
@@ -632,30 +628,33 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         }
       } catch (e) { console.warn(e); }
 
-      todos = await LojaDB.getProdutos();
-      document.getElementById('gridDestaque').innerHTML = todos.filter(p => p.destaque).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
-      document.getElementById('gridTendencia').innerHTML = todos.filter(p => p.tendencia).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
+      try {
+        todos = await LojaDB.getProdutos() || [];
+        const gd = document.getElementById('gridDestaque');
+        const gt = document.getElementById('gridTendencia');
+        if (gd) gd.innerHTML = todos.filter(p => p.destaque).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
+        if (gt) gt.innerHTML = todos.filter(p => p.tendencia).slice(0, 6).map(cardHTML).join('') || '<p class="empty">—</p>';
+      } catch (e) { console.warn('produtos', e); }
 
-      const cats = await LojaDB.getCategorias();
-      const catScroll = document.getElementById('catScroll');
-      if (catScroll) {
-        const icons = {
-          default: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&q=60'
-        };
-        catScroll.innerHTML = cats.slice(0, 8).map(c =>
-            `<a class="cat-chip-card" href="catalogo.html?cat=${encodeURIComponent(c.id)}">
-              <div class="cat-img" style="display:grid;place-items:center;font-size:36px;background:#ede9fe">${c.icone || '📂'}</div>
-              <span>${String(c.nome||'').replace(/</g,'')}</span>
-            </a>`
-          ).join('') || '';
-      }
-      const chips = document.getElementById('chipsCats');
-      if (chips) {
-        chips.innerHTML =
-          `<button type="button" class="chip active" data-id="">Todos</button>` +
-          cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${c.nome}</button>`).join('');
-      }
-      filtrar();
+      try {
+        const cats = await LojaDB.getCategorias() || [];
+        const catScroll = document.getElementById('catScroll');
+        if (catScroll) {
+          catScroll.innerHTML = cats.slice(0, 8).map(c =>
+              `<a class="cat-chip-card" href="catalogo.html?cat=${encodeURIComponent(c.id)}">
+                <div class="cat-img" style="display:grid;place-items:center;font-size:36px;background:#ede9fe">${c.icone || '📂'}</div>
+                <span>${String(c.nome||'').replace(/</g,'')}</span>
+              </a>`
+            ).join('') || '';
+        }
+        const chips = document.getElementById('chipsCats');
+        if (chips) {
+          chips.innerHTML =
+            `<button type="button" class="chip active" data-id="">Todos</button>` +
+            cats.map(c => `<button type="button" class="chip" data-id="${c.id}">${(c.nome||'').replace(/</g,'')}</button>`).join('');
+        }
+        if (typeof filtrar === 'function') filtrar();
+      } catch (e) { console.warn('cats', e); }
     })();
   </script>
 
@@ -677,7 +676,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     <a href="index.html" class="active"><span class="ico">🏠</span>Início</a>
     <a href="catalogo.html"><span class="ico">▦</span>Catálogo</a>
     <a href="carrinho.html"><span class="ico">🛒</span>Carrinho<span class="bn-badge" data-cart-count style="display:none">0</span></a>
-    <a href="admin/login.html"><span class="ico">👤</span>Conta</a>
+    <a href="conta.html"><span class="ico">👤</span>Conta</a>
   </nav>
 
 </body>

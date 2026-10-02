@@ -923,26 +923,222 @@ const LojaDB = {
     };
   },
   async getSettings() {
+    // Preferir cache local imediato (evita "flash" LODJA Store ao recarregar)
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem('lv_settings') || 'null'); } catch (e) {}
     try {
       if (!this._local && window.supabaseClient) {
         const { data } = await window.supabaseClient.from('lv_config').select('data').eq('id', 'main').maybeSingle();
-        if (data && data.data) return { ...this.defaultSettings(), ...data.data };
+        if (data && data.data) {
+          const merged = { ...this.defaultSettings(), ...data.data };
+          try { localStorage.setItem('lv_settings', JSON.stringify(merged)); } catch (e) {}
+          return merged;
+        }
       }
-    } catch (e) {}
-    try {
-      const s = JSON.parse(localStorage.getItem('lv_settings') || 'null');
-      return { ...this.defaultSettings(), ...(s || {}) };
-    } catch (e) { return this.defaultSettings(); }
+    } catch (e) { console.warn('getSettings remote', e); }
+    return { ...this.defaultSettings(), ...(local || {}) };
   },
   async saveSettings(partial) {
     const next = { ...(await this.getSettings()), ...partial };
     if (next.adminPassword) localStorage.setItem('lv_admin_pass', next.adminPassword);
-    localStorage.setItem('lv_settings', JSON.stringify(next));
+    // logo dataURL grande: manter só em local se falhar remoto
+    try { localStorage.setItem('lv_settings', JSON.stringify(next)); } catch (e) {
+      try {
+        const slim = { ...next, logoUrl: (next.logoUrl && next.logoUrl.indexOf('data:') === 0) ? 'logo-lodja.png' : next.logoUrl };
+        localStorage.setItem('lv_settings', JSON.stringify(slim));
+      } catch (e2) {}
+    }
     if (!this._local && window.supabaseClient) {
-      try { await window.supabaseClient.from('lv_config').upsert({ id: 'main', data: next }); } catch (e) {}
+      try {
+        const { error } = await window.supabaseClient.from('lv_config').upsert({ id: 'main', data: next });
+        if (error) console.warn('saveSettings', error);
+      } catch (e) { console.warn(e); }
     }
     return next;
   },
+
+  /** Resolve URL do logo para qualquer página */
+  resolveLogoUrl(logoUrl) {
+    if (!logoUrl) return (location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '') + 'logo-lodja.png';
+    if (logoUrl.indexOf('data:') === 0 || logoUrl.indexOf('http') === 0 || logoUrl.indexOf('/') === 0) return logoUrl;
+    const base = location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '';
+    return base + logoUrl.replace(/^\.\//, '');
+  },
+
+  applyBranding(settings) {
+    if (!settings) return;
+    const name = settings.siteName || 'LODJA Store';
+    const logo = this.resolveLogoUrl(settings.logoUrl);
+    document.querySelectorAll('#brandName, #footerName').forEach(el => { if (el) el.textContent = name; });
+    document.querySelectorAll('#brandLogo').forEach(el => {
+      if (!el) return;
+      el.style.display = '';
+      el.onerror = function() { this.onerror = null; this.src = (location.pathname.indexOf('/lodjastore') === 0 ? '/lodjastore/' : '') + 'logo-lodja.png'; };
+      el.src = logo;
+    });
+    try { document.title = name; } catch (e) {}
+  },
+
+  // ----- ANALYTICS / VISITAS -----
+  async registrarVisita(pagina) {
+    const device = (typeof Cart !== 'undefined' && Cart.deviceId) ? Cart.deviceId() :
+      (localStorage.getItem('lv_device_id') || ('dev_' + Date.now().toString(36)));
+    if (!localStorage.getItem('lv_device_id')) localStorage.setItem('lv_device_id', device);
+    const row = {
+      id: this.genId('vis_'),
+      device_id: device,
+      pagina: pagina || (location.pathname || '/'),
+      referrer: (document.referrer || '').slice(0, 300),
+      user_agent: (navigator.userAgent || '').slice(0, 200),
+      created_at: new Date().toISOString()
+    };
+    if (!this._local && window.supabaseClient) {
+      try { await window.supabaseClient.from('lv_visitas').insert(row); return; } catch (e) {}
+    }
+    const list = this._getLocal('lv_visitas');
+    list.unshift(row);
+    this._setLocal('lv_visitas', list.slice(0, 500));
+  },
+
+  async getEstatisticasVisitas() {
+    let rows = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data } = await window.supabaseClient.from('lv_visitas').select('*').order('created_at', { ascending: false }).limit(2000);
+        rows = data || [];
+      } catch (e) { rows = this._getLocal('lv_visitas'); }
+    } else rows = this._getLocal('lv_visitas');
+
+    const now = Date.now();
+    const day = 86400000;
+    const today = rows.filter(r => now - new Date(r.created_at).getTime() < day);
+    const week = rows.filter(r => now - new Date(r.created_at).getTime() < 7 * day);
+    const uniq = (arr) => new Set(arr.map(r => r.device_id)).size;
+    return {
+      totalVisitas: rows.length,
+      visitasHoje: today.length,
+      visitasSemana: week.length,
+      visitantesUnicos: uniq(rows),
+      unicosHoje: uniq(today),
+      unicosSemana: uniq(week),
+      porPagina: Object.entries(rows.reduce((a, r) => { a[r.pagina] = (a[r.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1])
+    };
+  },
+
+  async getEstatisticasCarrinho() {
+    // produtos mais colocados no carrinho + taxa abandono (devices com carrinho vs com pedido)
+    let carts = [], pedidos = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const c = await window.supabaseClient.from('lv_carrinho').select('*');
+        carts = c.data || [];
+      } catch (e) {}
+      try {
+        const p = await window.supabaseClient.from('lv_pedidos').select('id,cliente_telefone,device_id,data_pedido,estado');
+        pedidos = p.data || [];
+      } catch (e) { pedidos = await this.getPedidos({}).catch(() => []); }
+    } else {
+      carts = this._getLocal('lv_carrinho');
+      pedidos = this._getLocal('lv_pedidos');
+    }
+    const prodMap = {};
+    carts.forEach(r => {
+      const id = r.produto_id || r.produtoId;
+      if (!id) return;
+      if (!prodMap[id]) prodMap[id] = { produto_id: id, nome: r.nome || id, quantidade: 0, vezes: 0 };
+      prodMap[id].quantidade += Number(r.quantidade) || 1;
+      prodMap[id].vezes += 1;
+    });
+    const topProdutos = Object.values(prodMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 15);
+
+    const devicesCart = new Set(carts.map(c => c.device_id).filter(Boolean));
+    // pedidos sem device_id: usar telefone como proxy fraco
+    const devicesPedido = new Set(pedidos.map(p => p.device_id).filter(Boolean));
+    const abandonaram = [...devicesCart].filter(d => !devicesPedido.has(d));
+    const totalCartDevices = devicesCart.size || 1;
+    const taxaAbandono = Math.round((abandonaram.length / totalCartDevices) * 100);
+
+    return {
+      topProdutos,
+      devicesComCarrinho: devicesCart.size,
+      devicesComPedido: devicesPedido.size,
+      devicesAbandono: abandonaram.length,
+      taxaAbandono: devicesCart.size ? taxaAbandono : 0,
+      itensNoCarrinho: carts.reduce((s, c) => s + (Number(c.quantidade) || 0), 0)
+    };
+  },
+
+  // ----- CONTAS DE CLIENTES (email) -----
+  async registarClienteConta({ nome, email, telefone, password }) {
+    email = (email || '').trim().toLowerCase();
+    if (!email || !password) throw new Error('Email e palavra-passe obrigatórios');
+    const id = this.genId('cta_');
+    // hash simples (não é bcrypt — suficiente para painel interno; cliente não é admin)
+    const pass_hash = btoa(unescape(encodeURIComponent(password + '|lodja'))).slice(0, 64);
+    const row = {
+      id,
+      nome: (nome || '').trim(),
+      email,
+      telefone: (telefone || '').replace(/\D/g, ''),
+      pass_hash,
+      estado: 'activo',
+      data_criacao: new Date().toISOString()
+    };
+    if (!this._local && window.supabaseClient) {
+      const { data: exist } = await window.supabaseClient.from('lv_contas_clientes').select('id').eq('email', email).maybeSingle();
+      if (exist) throw new Error('Este email já está registado');
+      const { error } = await window.supabaseClient.from('lv_contas_clientes').insert(row);
+      if (error) throw error;
+    } else {
+      const list = this._getLocal('lv_contas_clientes');
+      if (list.some(c => c.email === email)) throw new Error('Este email já está registado');
+      list.unshift(row);
+      this._setLocal('lv_contas_clientes', list);
+    }
+    sessionStorage.setItem('lv_cliente_sessao', JSON.stringify({ id, email, nome: row.nome, telefone: row.telefone }));
+    return row;
+  },
+
+  async loginClienteConta(email, password) {
+    email = (email || '').trim().toLowerCase();
+    const pass_hash = btoa(unescape(encodeURIComponent(password + '|lodja'))).slice(0, 64);
+    let row = null;
+    if (!this._local && window.supabaseClient) {
+      const { data } = await window.supabaseClient.from('lv_contas_clientes').select('*').eq('email', email).maybeSingle();
+      row = data;
+    } else {
+      row = this._getLocal('lv_contas_clientes').find(c => c.email === email);
+    }
+    if (!row || row.pass_hash !== pass_hash) throw new Error('Email ou palavra-passe incorrectos');
+    if (row.estado === 'inactivo') throw new Error('Conta desactivada');
+    const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone };
+    sessionStorage.setItem('lv_cliente_sessao', JSON.stringify(sess));
+    return sess;
+  },
+
+  getClienteSessao() {
+    try { return JSON.parse(sessionStorage.getItem('lv_cliente_sessao') || 'null'); } catch (e) { return null; }
+  },
+  logoutCliente() {
+    sessionStorage.removeItem('lv_cliente_sessao');
+  },
+
+  async getDesempenhoCliente(contaId, email) {
+    let pedidos = [];
+    try { pedidos = await this.getPedidos({}); } catch (e) {}
+    const mine = pedidos.filter(p =>
+      (email && (p.cliente_email || '').toLowerCase() === email.toLowerCase()) ||
+      (p.conta_id && p.conta_id === contaId)
+    );
+    const total = mine.reduce((s, p) => s + (Number(p.total) || 0), 0);
+    return {
+      numPedidos: mine.length,
+      totalGasto: total,
+      ultimo: mine[0] || null,
+      pedidos: mine.slice(0, 20)
+    };
+  },
+
   async getAllPromocoes() {
     if (this._local) return this._getLocal('lv_promocoes');
     try {

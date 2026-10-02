@@ -27,6 +27,7 @@
     <div class="scrim" onclick="toggleMenu()"></div>
     <div class="panel">
       <a href="index.html">📊 Dashboard</a>
+      <a href="analytics.html">👁 Visitantes</a>
       <a href="produtos.html">👕 Produtos</a>
       <a href="categorias.html">📂 Categorias</a>
       <a href="fornecedores.html">🏭 Fornecedores</a>
@@ -83,7 +84,7 @@
     }
     document.getElementById('logoFile').onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;
-      logoData = await LojaDB.readFileAsDataURL(f, 400, 0.9);
+      logoData = await LojaDB.readFileAsDataURL(f, 240, 0.75);
       document.getElementById('logoPrev').src = logoData;
     };
     (async () => {
