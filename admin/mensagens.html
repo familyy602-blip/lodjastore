@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mensagens — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
+  <style>
+    .msg-layout { display:grid; gap:12px; }
+    @media(min-width:800px){ .msg-layout { grid-template-columns: 1fr 1.1fr; min-height: 60vh; } }
+    .msg-list { max-height: 70vh; overflow-y:auto; }
+    .msg-item {
+      background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:14px;
+      padding:12px; margin-bottom:8px; cursor:pointer; transition:.15s;
+    }
+    .msg-item:hover, .msg-item.active { border-color:#7c3aed; box-shadow:0 4px 14px rgba(124,58,237,.12); }
+    .msg-item.nova { border-left:4px solid #ef4444; }
+    .msg-item .who { font-weight:800; font-size:14px; }
+    .msg-item .preview { color:#64748b; font-size:13px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .msg-item .when { font-size:11px; color:#94a3b8; margin-top:6px; }
+    .msg-detail {
+      background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:16px; padding:16px;
+      display:flex; flex-direction:column; min-height:320px;
+    }
+    .bubble {
+      max-width:90%; padding:10px 14px; border-radius:14px; margin:8px 0; font-size:14px; line-height:1.45;
+    }
+    .bubble.in { background:#f1f5f9; align-self:flex-start; border-bottom-left-radius:4px; }
+    .bubble.out { background:#7c3aed; color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+    .msg-thread { flex:1; overflow-y:auto; display:flex; flex-direction:column; padding:8px 0; }
+    .msg-reply { display:flex; gap:8px; margin-top:12px; }
+    .msg-reply textarea { flex:1; border-radius:12px; border:1px solid #e2e8f0; padding:10px; font:inherit; min-height:70px; resize:vertical; }
+  </style>
+</head>
+<body class="admin-pro">
+  <header class="adm-top">
+    <div class="adm-top-row">
+      <div class="adm-brand">
+        <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
+        <div><strong>Mensagens</strong><small>Chat com clientes</small></div>
+      </div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
+    </div>
+  </header>
+  <div class="adm-drawer" id="drawer">
+    <div class="scrim" onclick="toggleMenu()"></div>
+    <div class="panel">
+      <a href="index.html">📊 Dashboard</a>
+      <a href="analytics.html">👁 Visitantes</a>
+      <a href="clientes.html">👥 Clientes registados</a>
+      <a href="mensagens.html" class="active">💬 Mensagens</a>
+      <a href="produtos.html">👕 Produtos</a>
+      <a href="categorias.html">📂 Categorias</a>
+      <a href="fornecedores.html">🏭 Fornecedores</a>
+      <a href="pedidos.html">📦 Pedidos</a>
+      <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
+      <a href="promocoes.html">🏷️ Promoções</a>
+      <a href="configuracoes.html">⚙️ Configurações</a>
+      <a href="/lodjastore/index.html">🏠 Ver loja</a>
+      <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
+    </div>
+  </div>
+  <div class="adm-shell">
+    <a class="adm-back" href="index.html">← Voltar</a>
+    <div class="adm-page-head">
+      <div class="ico">💬</div>
+      <div>
+        <h1>Mensagens do site</h1>
+        <p>Clientes escrevem pelo chat da loja — responda aqui.</p>
+      </div>
+    </div>
+    <div class="adm-actions-row">
+      <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
+    </div>
+    <div class="msg-layout">
+      <div class="msg-list" id="lista"></div>
+      <div class="msg-detail" id="detail">
+        <p style="color:#64748b;margin:auto;text-align:center">Seleccione uma mensagem à esquerda</p>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script>
+    if (!AdminAuth.require()) throw 0;
+    let msgs = [], selected = null;
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    function fmt(iso){ try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return iso; } }
+    function openMsg(id) {
+      selected = msgs.find(m => m.id === id);
+      if (!selected) return;
+      document.querySelectorAll('.msg-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+      if (selected.estado === 'nova') LojaDB.marcarMensagemLida(id).then(() => { selected.estado = 'lida'; renderList(); });
+      const d = document.getElementById('detail');
+      d.innerHTML = `
+        <div>
+          <strong style="font-size:16px">${esc(selected.nome)}</strong>
+          <div style="font-size:13px;color:#64748b">${esc(selected.email||'')} ${selected.telefone?'· 📞 '+esc(selected.telefone):''}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${fmt(selected.created_at)} · ${esc(selected.estado)}</div>
+        </div>
+        <div class="msg-thread">
+          <div class="bubble in">${esc(selected.mensagem)}</div>
+          ${selected.resposta ? `<div class="bubble out">${esc(selected.resposta)}<div style="font-size:11px;opacity:.8;margin-top:4px">${fmt(selected.respondido_em)}</div></div>` : ''}
+        </div>
+        <div class="msg-reply">
+          <textarea id="resp" placeholder="Escreva a resposta…">${selected.resposta && selected.estado==='respondida' ? '' : ''}</textarea>
+          <button type="button" class="adm-btn adm-btn-primary" onclick="sendReply()">Enviar</button>
+        </div>
+        ${selected.telefone ? `<a class="adm-btn adm-btn-ghost" style="margin-top:8px" target="_blank" rel="noopener"
+          href="https://wa.me/${esc(selected.telefone)}?text=${encodeURIComponent('Olá '+selected.nome+', ')}">Abrir WhatsApp</a>` : ''}`;
+    }
+    async function sendReply() {
+      const t = document.getElementById('resp').value.trim();
+      if (!t || !selected) return;
+      try {
+        await LojaDB.responderMensagem(selected.id, t);
+        alert('Resposta enviada.');
+        await load();
+        openMsg(selected.id);
+      } catch (e) { alert(e.message || e); }
+    }
+    function renderList() {
+      document.getElementById('lista').innerHTML = msgs.map(m => `
+        <div class="msg-item ${m.estado==='nova'?'nova':''} ${selected&&selected.id===m.id?'active':''}" data-id="${m.id}" onclick="openMsg('${m.id}')">
+          <div class="who">${esc(m.nome)} ${m.estado==='nova'?'<span style="color:#ef4444;font-size:11px">NOVA</span>':''}</div>
+          <div class="preview">${esc(m.mensagem)}</div>
+          <div class="when">${fmt(m.created_at)} · ${esc(m.estado)}</div>
+        </div>`).join('') || '<p style="color:#64748b;padding:20px;text-align:center">Nenhuma mensagem ainda.</p>';
+    }
+    async function load() {
+      msgs = await LojaDB.getMensagensChat();
+      renderList();
+      if (selected) {
+        const still = msgs.find(m => m.id === selected.id);
+        if (still) openMsg(still.id);
+      }
+    }
+    (async () => {
+      initSupabase();
+      await LojaDB.init();
+      await load();
+      setInterval(load, 20000);
+    })();
+  </script>
+</body>
+</html>

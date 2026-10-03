@@ -3,129 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Insights — Visitantes</title>
+  <title>Analytics — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
   <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    .insights {
-      --ig-bg: #121212;
-      --ig-card: #1a1a1a;
-      --ig-muted: #a1a1aa;
-      --ig-accent: #ff5500;
-      --ig-bar: #ff5500;
-      --ig-bar-dim: #3f3f46;
-      --ig-text: #fafafa;
+    .ia-wrap { background:#1e1b2e; color:#e2e8f0; border-radius:16px; padding:16px; margin-bottom:16px; }
+    .ia-top { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+    .ia-top h2 { margin:0; flex:1; font-size:1.2rem; color:#fff; }
+    .ia-period {
+      display:flex; flex-wrap:wrap; gap:6px;
     }
-    .insights-wrap {
-      background: linear-gradient(180deg, #0a0a0a 0%, #18181b 40%, #f1f5f9 40%);
-      border-radius: 20px;
-      padding: 0 0 8px;
-      margin: 0 -4px 20px;
-      overflow: hidden;
+    .ia-period button {
+      background:#2d2a3e; color:#c4b5fd; border:1px solid #3f3b52;
+      border-radius:8px; padding:7px 11px; font-size:12px; font-weight:700; cursor:pointer;
     }
-    .insights-hero {
-      background: #121212;
-      color: #fafafa;
-      padding: 20px 18px 28px;
-      border-radius: 20px 20px 0 0;
+    .ia-period button.active { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+    .ia-kpis {
+      display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px;
     }
-    .insights-hero h2 {
-      margin: 0 0 4px;
-      font-size: 1.35rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
+    @media(min-width:700px){ .ia-kpis { grid-template-columns:repeat(3,1fr); } }
+    @media(min-width:1000px){ .ia-kpis { grid-template-columns:repeat(6,1fr); } }
+    .ia-kpi {
+      background:#2a2740; border-radius:12px; padding:14px 12px;
     }
-    .insights-hero .sub { color: #a1a1aa; font-size: 13px; margin-bottom: 18px; }
-    .period-tabs {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+    .ia-kpi .n { font-size:1.45rem; font-weight:800; color:#fff; line-height:1.1; }
+    .ia-kpi .l { font-size:11px; color:#a78bfa; margin-top:6px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; }
+    .ia-chart { position:relative; height:240px; background:#2a2740; border-radius:12px; padding:12px; }
+    @media(min-width:700px){ .ia-chart { height:280px; } }
+    .ia-grid { display:grid; gap:12px; }
+    @media(min-width:800px){ .ia-grid { grid-template-columns:1fr 1fr; } }
+    .ia-card {
+      background:#fff; color:#0f172a; border-radius:14px; padding:14px;
+      border:1px solid #e2e8f0;
     }
-    .period-tabs button {
-      background: #27272a; color: #e4e4e7; border: none; border-radius: 999px;
-      padding: 8px 14px; font-weight: 700; font-size: 12px; cursor: pointer;
+    .ia-card h3 { margin:0 0 4px; font-size:15px; }
+    .ia-card .hint { color:#64748b; font-size:12px; margin:0 0 12px; }
+    .ia-row {
+      display:flex; align-items:center; gap:10px; padding:10px 0;
+      border-bottom:1px solid #f1f5f9; font-size:13px;
     }
-    .period-tabs button.active {
-      background: #ff5500; color: #fff;
+    .ia-row:last-child { border-bottom:none; }
+    .ia-row .rk {
+      width:24px; height:24px; border-radius:6px; background:#7c3aed; color:#fff;
+      font-size:11px; font-weight:800; display:grid; place-items:center; flex-shrink:0;
     }
-    .chart-dark {
-      position: relative;
-      height: 200px;
-      width: 100%;
-      margin-top: 8px;
-    }
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-      margin-top: 16px;
-    }
-    @media (min-width: 700px) {
-      .kpi-row { grid-template-columns: repeat(4, 1fr); }
-      .chart-dark { height: 260px; }
-    }
-    .kpi {
-      background: #1c1c1e;
-      border-radius: 14px;
-      padding: 14px;
-    }
-    .kpi .n {
-      font-size: 1.55rem;
-      font-weight: 800;
-      color: #fff;
-      line-height: 1.1;
-    }
-    .kpi .n.accent { color: #ff5500; }
-    .kpi .l { font-size: 11px; color: #a1a1aa; margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-    .section-ig {
-      background: #fff;
-      border-radius: 18px;
-      padding: 16px;
-      margin: 12px 0;
-      border: 1px solid #e2e8f0;
-    }
-    .section-ig h3 {
-      margin: 0 0 4px;
-      font-size: 1.05rem;
-      font-weight: 800;
-    }
-    .section-ig .hint { color: #64748b; font-size: 13px; margin: 0 0 14px; }
-    .track-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .track-row:last-child { border-bottom: none; }
-    .track-rank {
-      width: 28px; height: 28px; border-radius: 8px;
-      background: #18181b; color: #ff5500; font-weight: 800; font-size: 13px;
-      display: grid; place-items: center; flex-shrink: 0;
-    }
-    .track-cover {
-      width: 48px; height: 48px; border-radius: 10px;
-      background: linear-gradient(135deg, #ff5500, #7c3aed);
-      display: grid; place-items: center; color: #fff; font-size: 18px; flex-shrink: 0;
-    }
-    .track-meta { flex: 1; min-width: 0; }
-    .track-meta strong { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .track-meta span { font-size: 12px; color: #64748b; }
-    .track-plays {
-      display: flex; align-items: center; gap: 4px;
-      font-weight: 800; font-size: 14px; color: #18181b; flex-shrink: 0;
-    }
-    .track-plays .ico { color: #ff5500; }
-    .bar-simple {
-      display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 13px;
-    }
-    .bar-simple .lab { flex: 0 0 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .bar-simple .track { flex: 1; height: 8px; background: #e4e4e7; border-radius: 99px; overflow: hidden; }
-    .bar-simple .fill { height: 100%; background: #ff5500; border-radius: 99px; }
-    .bar-simple .val { width: 40px; text-align: right; font-weight: 700; }
-    .two-col { display: grid; gap: 12px; }
-    @media (min-width: 800px) { .two-col { grid-template-columns: 1fr 1fr; } }
+    .ia-row .meta { flex:1; min-width:0; }
+    .ia-row .meta strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ia-row .meta span { color:#64748b; font-size:11px; }
+    .ia-row .val { font-weight:800; color:#7c3aed; flex-shrink:0; }
+    .bar-row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
+    .bar-row .lab { flex:0 0 36%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bar-row .tr { flex:1; height:8px; background:#e2e8f0; border-radius:99px; overflow:hidden; }
+    .bar-row .fl { height:100%; background:#7c3aed; border-radius:99px; }
+    .bar-row .v { width:36px; text-align:right; font-weight:700; }
   </style>
 </head>
 <body class="admin-pro">
@@ -133,10 +66,11 @@
     <div class="adm-top-row">
       <div class="adm-brand">
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
-        <div><strong>Insights</strong><small>Visitantes da loja</small></div>
+        <div><strong>Analytics</strong><small>Visitantes e sessões</small></div>
       </div>
       <div class="adm-top-actions">
-        <a class="adm-icon-btn" href="clientes.html" title="Clientes">👥</a>
+        <a class="adm-icon-btn" href="mensagens.html" title="Mensagens">💬</a>
+        <a class="adm-icon-btn" href="clientes.html">👥</a>
         <a class="adm-icon-btn" href="index.html">🏠</a>
       </div>
     </div>
@@ -147,6 +81,7 @@
       <a href="index.html">📊 Dashboard</a>
       <a href="analytics.html" class="active">👁 Visitantes</a>
       <a href="clientes.html">👥 Clientes registados</a>
+      <a href="mensagens.html">💬 Mensagens</a>
       <a href="produtos.html">👕 Produtos</a>
       <a href="categorias.html">📂 Categorias</a>
       <a href="fornecedores.html">🏭 Fornecedores</a>
@@ -163,48 +98,51 @@
     <a class="adm-back" href="index.html">← Voltar</a>
     <div class="adm-actions-row" style="margin-bottom:12px">
       <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
-      <a class="adm-btn adm-btn-ghost" href="clientes.html">👥 Clientes registados</a>
+      <a class="adm-btn adm-btn-ghost" href="clientes.html">👥 Clientes</a>
+      <a class="adm-btn adm-btn-ghost" href="mensagens.html">💬 Chat</a>
     </div>
 
-    <div class="insights-wrap">
-      <div class="insights-hero">
-        <h2>Your insights</h2>
-        <p class="sub">Actividade da loja · últimos 30 dias</p>
-        <div class="period-tabs">
-          <button type="button" class="active" data-p="30" onclick="setPeriod(30, this)">30 dias</button>
-          <button type="button" data-p="7" onclick="setPeriod(7, this)">7 dias</button>
-          <button type="button" data-p="1" onclick="setPeriod(1, this)">Hoje</button>
+    <div class="ia-wrap">
+      <div class="ia-top">
+        <h2>Páginas · Analytics</h2>
+        <div class="ia-period" id="periods">
+          <button type="button" data-d="1">Hoje</button>
+          <button type="button" data-d="7">Últimos 7 dias</button>
+          <button type="button" class="active" data-d="30">Últimos 30 dias</button>
+          <button type="button" data-d="90">Últimos 90 dias</button>
         </div>
-        <div class="chart-dark"><canvas id="chartVisitas"></canvas></div>
-        <div class="kpi-row" id="kpis"></div>
       </div>
+      <div class="ia-kpis" id="kpis"></div>
+      <div class="ia-chart"><canvas id="chartMain"></canvas></div>
     </div>
 
-    <div class="two-col">
-      <div class="section-ig">
-        <h3>Top visitantes (clientes com conta)</h3>
-        <p class="hint">Quantas vezes cada cliente registado visitou o site (com sessão)</p>
-        <div id="topListeners"></div>
-      </div>
-      <div class="section-ig">
-        <h3>Top tracks · páginas</h3>
-        <p class="hint">Páginas mais abertas na loja</p>
+    <div class="ia-grid">
+      <div class="ia-card">
+        <h3>Páginas mais vistas</h3>
+        <p class="hint">Visualizações por URL</p>
         <div id="topPages"></div>
       </div>
+      <div class="ia-card">
+        <h3>Geográfico · Países</h3>
+        <p class="hint">De onde acedem à loja</p>
+        <div id="topPais"></div>
+      </div>
+      <div class="ia-card">
+        <h3>Clientes com conta</h3>
+        <p class="hint">Quem visitou com sessão iniciada</p>
+        <div id="topClientes"></div>
+      </div>
+      <div class="ia-card">
+        <h3>Referenciadores</h3>
+        <p class="hint">Origem do tráfego</p>
+        <div id="topRef"></div>
+      </div>
     </div>
 
-    <div class="section-ig">
+    <div class="ia-card" style="margin-top:12px">
       <h3>Carrinho e abandono</h3>
-      <p class="hint">Quem enche o carrinho e não conclui o pedido</p>
-      <div class="kpi-row" id="kpiCart" style="grid-template-columns:repeat(2,1fr)"></div>
-      <h4 style="margin:16px 0 8px;font-size:14px">Produtos mais seleccionados no carrinho</h4>
-      <div id="topProds"></div>
-    </div>
-
-    <div class="section-ig">
-      <h3>Visitantes anónimos (dispositivos)</h3>
-      <p class="hint">Dispositivos sem login · mais activos</p>
-      <div id="topDevices"></div>
+      <p class="hint">Produtos no carrinho sem pedido</p>
+      <div id="cartBlock"></div>
     </div>
   </div>
 
@@ -214,158 +152,125 @@
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
-    let chart = null, rawV = null, rawC = null, period = 30;
+    let chart = null, periodDays = 30, rawV = null, rawC = null;
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
     function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-    function shortPage(p) {
-      if (!p) return '—';
-      try {
-        const u = p.split('?')[0];
-        const parts = u.split('/').filter(Boolean);
-        return parts.slice(-2).join('/') || u;
-      } catch (e) { return p; }
+    function shortPage(p){
+      if(!p) return '—';
+      const parts = String(p).split('?')[0].split('/').filter(Boolean);
+      return parts.slice(-2).join('/') || p;
     }
-    function setPeriod(n, btn) {
-      period = n;
-      document.querySelectorAll('.period-tabs button').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      paint();
+    document.getElementById('periods').onclick = (e) => {
+      const b = e.target.closest('button[data-d]');
+      if (!b) return;
+      periodDays = Number(b.dataset.d);
+      document.querySelectorAll('#periods button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      load();
+    };
+    function rowsList(items, nameFn, valFn, subFn) {
+      if (!items || !items.length) return '<p style="color:#64748b;font-size:13px">Sem dados neste período.</p>';
+      return items.map((it, i) => `
+        <div class="ia-row">
+          <div class="rk">${i+1}</div>
+          <div class="meta">
+            <strong title="${esc(nameFn(it))}">${esc(nameFn(it))}</strong>
+            ${subFn ? '<span>'+esc(subFn(it))+'</span>' : ''}
+          </div>
+          <div class="val">${valFn(it)}</div>
+        </div>`).join('');
     }
-    function sliceSerie(serie) {
-      if (!serie) return [];
-      if (period >= 30) return serie;
-      if (period === 7) return serie.slice(-7);
-      return serie.slice(-1);
+    function bars(entries) {
+      if (!entries.length) return '<p style="color:#64748b;font-size:13px">Sem dados.</p>';
+      const max = Math.max(1, ...entries.map(e => e[1]));
+      return entries.map(([lab, n]) => `
+        <div class="bar-row">
+          <div class="lab" title="${esc(lab)}">${esc(lab)}</div>
+          <div class="tr"><div class="fl" style="width:${Math.round(n/max*100)}%"></div></div>
+          <div class="v">${n}</div>
+        </div>`).join('');
     }
     function paint() {
       if (!rawV) return;
-      const serie = sliceSerie(rawV.serieDiaria || []);
-      const labels = serie.map(d => d.label);
-      const dataVis = serie.map(d => d.visitas);
-      const dataUni = serie.map(d => d.unicos);
-
-      const sumV = dataVis.reduce((a,b)=>a+b,0);
-      const sumU = period === 1 ? rawV.unicosHoje : (period === 7 ? rawV.unicosSemana : rawV.visitantesUnicos);
-
       document.getElementById('kpis').innerHTML = `
-        <div class="kpi"><div class="n accent">${sumV}</div><div class="l">Visitas</div></div>
-        <div class="kpi"><div class="n">${sumU}</div><div class="l">Únicos</div></div>
-        <div class="kpi"><div class="n">${rawV.visitasHoje}</div><div class="l">Hoje</div></div>
-        <div class="kpi"><div class="n">${(rawC && rawC.taxaAbandono) || 0}%</div><div class="l">Abandono</div></div>`;
+        <div class="ia-kpi"><div class="n">${rawV.visitantesUnicos}</div><div class="l">Visitantes</div></div>
+        <div class="ia-kpi"><div class="n">${rawV.totalVisitas}</div><div class="l">Visualizações</div></div>
+        <div class="ia-kpi"><div class="n">${rawV.sessoes}</div><div class="l">Sessões</div></div>
+        <div class="ia-kpi"><div class="n">${rawV.avgSessionLabel}</div><div class="l">Duração média</div></div>
+        <div class="ia-kpi"><div class="n">${rawV.bounceRate}%</div><div class="l">Taxa de rejeição</div></div>
+        <div class="ia-kpi"><div class="n">${rawV.viewsPerSession}</div><div class="l">Views / sessão</div></div>`;
 
-      const ctx = document.getElementById('chartVisitas').getContext('2d');
+      const serie = rawV.serieDiaria || [];
+      const ctx = document.getElementById('chartMain').getContext('2d');
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
-        type: 'bar',
+        type: 'line',
         data: {
-          labels,
+          labels: serie.map(d => d.label),
           datasets: [
             {
-              label: 'Visitas',
-              data: dataVis,
-              backgroundColor: '#ff5500',
-              borderRadius: 4,
-              borderSkipped: false,
-              barPercentage: 0.7,
-              categoryPercentage: 0.85
+              label: 'Visitantes',
+              data: serie.map(d => d.unicos),
+              borderColor: '#a78bfa',
+              backgroundColor: 'rgba(167,139,250,.15)',
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2
             },
             {
-              label: 'Únicos',
-              data: dataUni,
-              backgroundColor: '#3f3f46',
-              borderRadius: 4,
-              borderSkipped: false,
-              barPercentage: 0.7,
-              categoryPercentage: 0.85
+              label: 'Visualizações',
+              data: serie.map(d => d.visitas),
+              borderColor: '#f59e0b',
+              backgroundColor: 'transparent',
+              tension: 0.35,
+              pointRadius: 2
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: {
-              display: true,
-              labels: { color: '#a1a1aa', boxWidth: 12, font: { size: 11, weight: '600' } }
-            },
-            tooltip: {
-              backgroundColor: '#27272a',
-              titleColor: '#fff',
-              bodyColor: '#e4e4e7'
-            }
+            legend: { labels: { color: '#c4b5fd', boxWidth: 12, font: { size: 11 } } },
+            tooltip: { backgroundColor: '#1e1b2e' }
           },
           scales: {
-            x: {
-              grid: { display: false },
-              ticks: { color: '#71717a', maxRotation: 0, autoSkip: true, maxTicksLimit: 8, font: { size: 10 } }
-            },
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(255,255,255,.06)' },
-              ticks: { color: '#71717a', stepSize: 1, font: { size: 10 } }
-            }
+            x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#94a3b8', maxTicksLimit: 8, font:{size:10} } },
+            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#94a3b8', stepSize: 1, font:{size:10} } }
           }
         }
       });
 
-      // Top clientes (listeners)
-      const topC = rawV.topClientes || [];
-      document.getElementById('topListeners').innerHTML = topC.length ? topC.map((c, i) => `
-        <div class="track-row">
-          <div class="track-rank">${i+1}</div>
-          <div class="track-cover">👤</div>
-          <div class="track-meta">
-            <strong>${esc(c.email || c.conta_id || 'Cliente')}</strong>
-            <span>${c.devices || 1} dispositivo(s)</span>
-          </div>
-          <div class="track-plays"><span class="ico">▶</span> ${c.visitas}</div>
-        </div>`).join('') : '<p style="color:#64748b;font-size:14px">Ainda sem visitas de clientes com sessão. Peça aos clientes para entrarem em Conta.</p>';
+      document.getElementById('topPages').innerHTML = rowsList(
+        (rawV.porPagina || []).slice(0, 12),
+        x => shortPage(x[0]),
+        x => x[1],
+        x => x[0]
+      );
+      document.getElementById('topPais').innerHTML = bars((rawV.porPais || []).slice(0, 10));
+      document.getElementById('topClientes').innerHTML = rowsList(
+        rawV.topClientes || [],
+        x => x.nome || x.email || x.conta_id || 'Cliente',
+        x => x.visitas + ' views',
+        x => (x.email || '') + (x.devices ? ' · ' + x.devices + ' disp.' : '')
+      );
+      document.getElementById('topRef').innerHTML = bars((rawV.porReferrer || []).slice(0, 10));
 
-      // Pages
-      const pages = (rawV.porPagina || []).slice(0, 10);
-      const maxP = Math.max(1, ...pages.map(x => x[1]));
-      document.getElementById('topPages').innerHTML = pages.length ? pages.map(([p, n], i) => `
-        <div class="track-row">
-          <div class="track-rank">${i+1}</div>
-          <div class="track-cover">📄</div>
-          <div class="track-meta"><strong title="${esc(p)}">${esc(shortPage(p))}</strong><span>${esc(p)}</span></div>
-          <div class="track-plays"><span class="ico">▶</span> ${n}</div>
-        </div>`).join('') : '<p style="color:#64748b">Sem dados de páginas.</p>';
-
-      // Cart
       if (rawC) {
-        document.getElementById('kpiCart').innerHTML = `
-          <div class="kpi" style="background:#0f172a"><div class="n accent">${rawC.taxaAbandono}%</div><div class="l">Taxa abandono</div></div>
-          <div class="kpi" style="background:#0f172a"><div class="n">${rawC.devicesComCarrinho}</div><div class="l">C/ carrinho</div></div>
-          <div class="kpi" style="background:#0f172a"><div class="n">${rawC.devicesAbandono}</div><div class="l">Só carrinho</div></div>
-          <div class="kpi" style="background:#0f172a"><div class="n">${rawC.itensNoCarrinho}</div><div class="l">Itens activos</div></div>`;
-        const prods = rawC.topProdutos || [];
-        const max = Math.max(1, ...prods.map(x => x.quantidade));
-        document.getElementById('topProds').innerHTML = prods.length ? prods.map(x => `
-          <div class="bar-simple">
-            <div class="lab" title="${esc(x.nome)}">${esc(x.nome)}</div>
-            <div class="track"><div class="fill" style="width:${Math.round(x.quantidade/max*100)}%"></div></div>
-            <div class="val">${x.quantidade}</div>
-          </div>`).join('') : '<p style="color:#64748b;font-size:13px">Carrinho vazio no momento.</p>';
-      }
-
-      const devs = rawV.topDevices || [];
-      document.getElementById('topDevices').innerHTML = devs.length ? devs.map((d, i) => `
-        <div class="track-row">
-          <div class="track-rank">${i+1}</div>
-          <div class="track-cover">📱</div>
-          <div class="track-meta">
-            <strong>${esc((d.device_id||'').slice(0, 18))}…</strong>
-            <span>Visitante anónimo</span>
+        document.getElementById('cartBlock').innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px">
+            <div class="ia-kpi" style="background:#1e1b2e"><div class="n" style="color:#f59e0b">${rawC.taxaAbandono}%</div><div class="l">Abandono</div></div>
+            <div class="ia-kpi" style="background:#1e1b2e"><div class="n">${rawC.devicesComCarrinho}</div><div class="l">C/ carrinho</div></div>
+            <div class="ia-kpi" style="background:#1e1b2e"><div class="n">${rawC.devicesAbandono}</div><div class="l">Só carrinho</div></div>
+            <div class="ia-kpi" style="background:#1e1b2e"><div class="n">${rawC.itensNoCarrinho}</div><div class="l">Itens activos</div></div>
           </div>
-          <div class="track-plays"><span class="ico">▶</span> ${d.visitas}</div>
-        </div>`).join('') : '<p style="color:#64748b;font-size:14px">Sem dispositivos registados ainda.</p>';
+          ${bars((rawC.topProdutos||[]).map(p => [p.nome, p.quantidade]))}`;
+      }
     }
-
     async function load() {
-      rawV = await LojaDB.getEstatisticasVisitas();
+      rawV = await LojaDB.getEstatisticasVisitas({ periodDays });
       rawC = await LojaDB.getEstatisticasCarrinho();
-      // enriquecer emails dos top clientes se possível
       try {
         const contas = await LojaDB.getContasClientes();
         const byId = Object.fromEntries(contas.map(c => [c.id, c]));

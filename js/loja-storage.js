@@ -989,6 +989,28 @@ const LojaDB = {
       const sess = this.getClienteSessao();
       if (sess) { conta_id = sess.id || null; conta_email = sess.email || null; }
     } catch (e) {}
+
+    // País (1x por sessão de browser — cache 24h)
+    let pais = localStorage.getItem('lv_geo_pais') || null;
+    let cidade = localStorage.getItem('lv_geo_cidade') || null;
+    const geoTs = Number(localStorage.getItem('lv_geo_ts') || 0);
+    if (!pais || Date.now() - geoTs > 86400000) {
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 2500);
+        const res = await fetch('https://ipapi.co/json/', { signal: ctrl.signal });
+        clearTimeout(to);
+        if (res.ok) {
+          const g = await res.json();
+          pais = g.country_name || g.country || null;
+          cidade = g.city || null;
+          if (pais) localStorage.setItem('lv_geo_pais', pais);
+          if (cidade) localStorage.setItem('lv_geo_cidade', cidade);
+          localStorage.setItem('lv_geo_ts', String(Date.now()));
+        }
+      } catch (e) {}
+    }
+
     const row = {
       id: this.genId('vis_'),
       device_id: device,
@@ -997,6 +1019,8 @@ const LojaDB = {
       pagina: pagina || (location.pathname || '/'),
       referrer: (document.referrer || '').slice(0, 300),
       user_agent: (navigator.userAgent || '').slice(0, 200),
+      pais: pais,
+      cidade: cidade,
       created_at: new Date().toISOString()
     };
     if (!this._local && window.supabaseClient) {
@@ -1004,7 +1028,258 @@ const LojaDB = {
     }
     const list = this._getLocal('lv_visitas');
     list.unshift(row);
-    this._setLocal('lv_visitas', list.slice(0, 500));
+    this._setLocal('lv_visitas', list.slice(0, 800));
+  },
+
+  /** Agrupa visitas em sessões (gap > 30 min = nova sessão) */
+  _buildSessions(rows) {
+    const byDev = {};
+    rows.forEach(r => {
+      const d = r.device_id || 'unknown';
+      if (!byDev[d]) byDev[d] = [];
+      byDev[d].push(r);
+    });
+    const sessions = [];
+    Object.keys(byDev).forEach(dev => {
+      const list = byDev[dev].slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      let cur = null;
+      list.forEach(r => {
+        const t = new Date(r.created_at).getTime();
+        if (!cur || t - cur.fim > 30 * 60 * 1000) {
+          cur = { device_id: dev, inicio: t, fim: t, pages: [r], conta_id: r.conta_id, pais: r.pais };
+          sessions.push(cur);
+        } else {
+          cur.fim = t;
+          cur.pages.push(r);
+          if (r.conta_id) cur.conta_id = r.conta_id;
+          if (r.pais) cur.pais = r.pais;
+        }
+      });
+    });
+    return sessions;
+  },
+
+  async getEstatisticasVisitas(opts = {}) {
+    let rows = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data } = await window.supabaseClient.from('lv_visitas').select('*').order('created_at', { ascending: false }).limit(5000);
+        rows = data || [];
+      } catch (e) { rows = this._getLocal('lv_visitas'); }
+    } else rows = this._getLocal('lv_visitas');
+
+    const now = Date.now();
+    const day = 86400000;
+    // Filtro de período
+    let from = opts.from ? new Date(opts.from).getTime() : now - 30 * day;
+    let to = opts.to ? new Date(opts.to).getTime() + day - 1 : now;
+    if (opts.periodDays) {
+      from = now - opts.periodDays * day;
+      to = now;
+    }
+    const filtered = rows.filter(r => {
+      const t = new Date(r.created_at).getTime();
+      return t >= from && t <= to;
+    });
+
+    const today = rows.filter(r => now - new Date(r.created_at).getTime() < day);
+    const week = rows.filter(r => now - new Date(r.created_at).getTime() < 7 * day);
+    const uniq = (arr) => new Set(arr.map(r => r.device_id).filter(Boolean)).size;
+
+    const sessions = this._buildSessions(filtered);
+    const bounce = sessions.filter(s => s.pages.length === 1).length;
+    const bounceRate = sessions.length ? Math.round((bounce / sessions.length) * 100) : 0;
+    const durations = sessions.map(s => Math.max(0, s.fim - s.inicio));
+    const avgDurMs = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+    const avgMin = Math.floor(avgDurMs / 60000);
+    const avgSec = Math.floor((avgDurMs % 60000) / 1000);
+    const viewsPerSession = sessions.length ? (filtered.length / sessions.length) : 0;
+
+    // Série diária dentro do período
+    const daysSpan = Math.min(90, Math.max(1, Math.ceil((to - from) / day)));
+    const dias = [];
+    for (let i = daysSpan - 1; i >= 0; i--) {
+      const d = new Date(to);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      if (d.getTime() < from - day) continue;
+      dias.push({ key, label: d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }), visitas: 0, unicos: new Set(), sessoes: 0 });
+    }
+    const byDay = Object.fromEntries(dias.map(d => [d.key, d]));
+    filtered.forEach(r => {
+      const k = (r.created_at || '').slice(0, 10);
+      if (byDay[k]) {
+        byDay[k].visitas++;
+        if (r.device_id) byDay[k].unicos.add(r.device_id);
+      }
+    });
+    sessions.forEach(s => {
+      const k = new Date(s.inicio).toISOString().slice(0, 10);
+      if (byDay[k]) byDay[k].sessoes++;
+    });
+    const serieDiaria = dias.map(d => ({
+      data: d.key,
+      label: d.label,
+      visitas: d.visitas,
+      unicos: d.unicos.size,
+      sessoes: d.sessoes
+    }));
+
+    const byConta = {};
+    const byDevice = {};
+    filtered.forEach(r => {
+      if (r.conta_id || r.conta_email) {
+        const key = r.conta_id || r.conta_email;
+        if (!byConta[key]) byConta[key] = { conta_id: r.conta_id, email: r.conta_email, visitas: 0, devices: new Set() };
+        byConta[key].visitas++;
+        if (r.device_id) byConta[key].devices.add(r.device_id);
+      } else if (r.device_id) {
+        if (!byDevice[r.device_id]) byDevice[r.device_id] = { device_id: r.device_id, visitas: 0, pais: r.pais };
+        byDevice[r.device_id].visitas++;
+        if (r.pais) byDevice[r.device_id].pais = r.pais;
+      }
+    });
+    const topClientes = Object.values(byConta)
+      .map(c => ({ ...c, devices: c.devices.size }))
+      .sort((a, b) => b.visitas - a.visitas)
+      .slice(0, 20);
+    const topDevices = Object.values(byDevice).sort((a, b) => b.visitas - a.visitas).slice(0, 15);
+
+    // Geografia
+    const byPais = {};
+    filtered.forEach(r => {
+      const p = r.pais || 'Desconhecido';
+      byPais[p] = (byPais[p] || 0) + 1;
+    });
+    const porPais = Object.entries(byPais).sort((a, b) => b[1] - a[1]);
+
+    // Referrers
+    const byRef = {};
+    filtered.forEach(r => {
+      let ref = r.referrer || '(directo)';
+      try {
+        if (ref !== '(directo)' && ref.startsWith('http')) ref = new URL(ref).hostname;
+      } catch (e) {}
+      byRef[ref] = (byRef[ref] || 0) + 1;
+    });
+    const porReferrer = Object.entries(byRef).sort((a, b) => b[1] - a[1]).slice(0, 12);
+
+    return {
+      totalVisitas: filtered.length,
+      visitasHoje: today.length,
+      visitasSemana: week.length,
+      visitantesUnicos: uniq(filtered),
+      unicosHoje: uniq(today),
+      unicosSemana: uniq(week),
+      sessoes: sessions.length,
+      bounceRate,
+      avgSessionLabel: String(avgMin).padStart(2, '0') + ':' + String(avgSec).padStart(2, '0'),
+      avgSessionMs: avgDurMs,
+      viewsPerSession: Math.round(viewsPerSession * 100) / 100,
+      porPagina: Object.entries(filtered.reduce((a, r) => { a[r.pagina] = (a[r.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1]),
+      serieDiaria,
+      topClientes,
+      topDevices,
+      porPais,
+      porReferrer,
+      periodFrom: new Date(from).toISOString(),
+      periodTo: new Date(to).toISOString()
+    };
+  },
+
+  // ----- CHAT / MENSAGENS -----
+  async enviarMensagemChat({ nome, email, telefone, texto, conta_id }) {
+    const row = {
+      id: this.genId('msg_'),
+      nome: (nome || '').trim() || 'Visitante',
+      email: (email || '').trim().toLowerCase() || null,
+      telefone: (telefone || '').replace(/\D/g, '') || null,
+      conta_id: conta_id || null,
+      mensagem: (texto || '').trim(),
+      resposta: null,
+      estado: 'nova',
+      created_at: new Date().toISOString(),
+      respondido_em: null
+    };
+    if (!row.mensagem) throw new Error('Escreva uma mensagem');
+    if (!this._local && window.supabaseClient) {
+      const { error } = await window.supabaseClient.from('lv_mensagens').insert(row);
+      if (error) throw error;
+      try {
+        await this.addNotificacao({
+          tipo: 'chat',
+          titulo: 'Nova mensagem no chat',
+          mensagem: row.nome + ': ' + row.mensagem.slice(0, 80),
+          ref_tipo: 'chat',
+          ref_id: row.id
+        });
+      } catch (e) {}
+    } else {
+      const list = this._getLocal('lv_mensagens');
+      list.unshift(row);
+      this._setLocal('lv_mensagens', list);
+    }
+    return row;
+  },
+
+  async getMensagensChat() {
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('lv_mensagens')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(300);
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        return this._getLocal('lv_mensagens');
+      }
+    }
+    return this._getLocal('lv_mensagens');
+  },
+
+  async getMensagensCliente(email, telefone) {
+    const all = await this.getMensagensChat();
+    const em = (email || '').toLowerCase();
+    const tel = (telefone || '').replace(/\D/g, '');
+    return all.filter(m =>
+      (em && m.email === em) || (tel && m.telefone === tel)
+    ).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  },
+
+  async responderMensagem(id, resposta) {
+    const patch = {
+      resposta: (resposta || '').trim(),
+      estado: 'respondida',
+      respondido_em: new Date().toISOString()
+    };
+    if (!this._local && window.supabaseClient) {
+      const { error } = await window.supabaseClient.from('lv_mensagens').update(patch).eq('id', id);
+      if (error) throw error;
+    } else {
+      const list = this._getLocal('lv_mensagens');
+      const i = list.findIndex(m => m.id === id);
+      if (i >= 0) list[i] = { ...list[i], ...patch };
+      this._setLocal('lv_mensagens', list);
+    }
+  },
+
+  async marcarMensagemLida(id) {
+    if (!this._local && window.supabaseClient) {
+      await window.supabaseClient.from('lv_mensagens').update({ estado: 'lida' }).eq('id', id).eq('estado', 'nova');
+    } else {
+      const list = this._getLocal('lv_mensagens');
+      const i = list.findIndex(m => m.id === id);
+      if (i >= 0 && list[i].estado === 'nova') list[i].estado = 'lida';
+      this._setLocal('lv_mensagens', list);
+    }
+  },
+
+  async countMensagensNovas() {
+    const all = await this.getMensagensChat();
+    return all.filter(m => m.estado === 'nova').length;
   },
 
   async getEstatisticasVisitas() {
