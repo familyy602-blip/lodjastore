@@ -1021,6 +1021,50 @@ const LojaDB = {
     const today = rows.filter(r => now - new Date(r.created_at).getTime() < day);
     const week = rows.filter(r => now - new Date(r.created_at).getTime() < 7 * day);
     const uniq = (arr) => new Set(arr.map(r => r.device_id)).size;
+    // Série diária (últimos 30 dias) — estilo insights
+    const dias = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dias.push({ key, label: d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' }), visitas: 0, unicos: new Set() });
+    }
+    const byDay = Object.fromEntries(dias.map(d => [d.key, d]));
+    rows.forEach(r => {
+      const k = (r.created_at || '').slice(0, 10);
+      if (byDay[k]) {
+        byDay[k].visitas++;
+        if (r.device_id) byDay[k].unicos.add(r.device_id);
+      }
+    });
+    const serieDiaria = dias.map(d => ({
+      data: d.key,
+      label: d.label,
+      visitas: d.visitas,
+      unicos: d.unicos.size
+    }));
+
+    // Top "listeners" = contas registadas + devices anónimos por visitas
+    const byConta = {};
+    const byDevice = {};
+    rows.forEach(r => {
+      if (r.conta_id || r.conta_email) {
+        const key = r.conta_id || r.conta_email;
+        if (!byConta[key]) byConta[key] = { conta_id: r.conta_id, email: r.conta_email, visitas: 0, devices: new Set() };
+        byConta[key].visitas++;
+        if (r.device_id) byConta[key].devices.add(r.device_id);
+      } else if (r.device_id) {
+        if (!byDevice[r.device_id]) byDevice[r.device_id] = { device_id: r.device_id, visitas: 0 };
+        byDevice[r.device_id].visitas++;
+      }
+    });
+    const topClientes = Object.values(byConta)
+      .map(c => ({ ...c, devices: c.devices.size }))
+      .sort((a, b) => b.visitas - a.visitas)
+      .slice(0, 15);
+    const topDevices = Object.values(byDevice).sort((a, b) => b.visitas - a.visitas).slice(0, 10);
+
     return {
       totalVisitas: rows.length,
       visitasHoje: today.length,
@@ -1028,7 +1072,11 @@ const LojaDB = {
       visitantesUnicos: uniq(rows),
       unicosHoje: uniq(today),
       unicosSemana: uniq(week),
-      porPagina: Object.entries(rows.reduce((a, r) => { a[r.pagina] = (a[r.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1])
+      porPagina: Object.entries(rows.reduce((a, r) => { a[r.pagina] = (a[r.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1]),
+      serieDiaria,
+      topClientes,
+      topDevices,
+      _rows: rows
     };
   },
 
