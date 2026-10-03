@@ -583,9 +583,25 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <script>
     (async () => {
       initSupabase(); await LojaDB.init();
-      await Cart.load();
-      await Cart.load(); const items = Cart.get();
-      if (!items.length) { location.href = 'carrinho.html'; return; }
+      // Preferir cache local (item acabado de adicionar) e depois sincronizar
+      let items = Cart.get();
+      if (!items.length) {
+        try {
+          const loc = JSON.parse(localStorage.getItem('lv_carrinho') || '[]');
+          if (loc.length) { Cart._cache = loc; items = loc; }
+        } catch (e) {}
+      }
+      if (!items.length) {
+        await Cart.load();
+        items = Cart.get();
+      } else {
+        // sync em background sem apagar o que já temos
+        Cart.load().catch(function(){});
+      }
+      if (!items.length) {
+        document.getElementById('resumo').innerHTML = '<p class="empty">Carrinho vazio. <a href="catalogo.html">Voltar ao catálogo</a></p>';
+        return;
+      }
       const promos = await LojaDB.getPromocoesActivas();
       const calc = LojaDB.calcularDesconto(items, promos);
       document.getElementById('resumo').innerHTML = `

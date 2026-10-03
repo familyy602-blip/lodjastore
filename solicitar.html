@@ -668,7 +668,22 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       }
     };
     (async () => {
-      initSupabase(); await LojaDB.init();
+      
+    // Pré-seleccionar produto se veio da página do produto
+    (function(){
+      try {
+        var p = new URLSearchParams(location.search);
+        var pid = p.get('produto');
+        if (pid) {
+          window.__preProduto = pid;
+          window.__preTam = p.get('tamanho') || '';
+          window.__preCor = p.get('cor') || '';
+          window.__preQty = p.get('qty') || '1';
+        }
+      } catch(e){}
+    })();
+
+    initSupabase(); await LojaDB.init();
       categorias = await LojaDB.getAllCategorias();
       produtos = await LojaDB.getProdutos({});
       // carregar variações se possível
@@ -686,6 +701,26 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
           categorias.map(c => '<option value="'+c.id+'">'+(c.icone||'📂')+' '+(c.nome||'')+'</option>').join('');
       }
       renderProdSelect();
+      // Aplicar produto vindo de produto.html?produto=
+      if (window.__preProduto) {
+        var sel = document.getElementById('prodSelect');
+        if (sel) {
+          sel.value = window.__preProduto;
+          if (typeof onProdChange === 'function') onProdChange();
+        }
+        var q = document.getElementById('qty');
+        if (q && window.__preQty) q.value = window.__preQty;
+        setTimeout(function(){
+          if (window.__preTam) {
+            var ts = document.getElementById('tamSelect');
+            if (ts) { ts.value = window.__preTam; }
+          }
+          if (window.__preCor) {
+            var cs = document.getElementById('corSelect');
+            if (cs) { cs.value = window.__preCor; }
+          }
+        }, 100);
+      }
     })();
   </script>
 

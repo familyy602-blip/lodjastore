@@ -658,7 +658,26 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       if (btnN) btnN.onclick = async function() {
         btnN.disabled = true;
         try {
-          if (await addAoCarrinho()) location.href = 'checkout.html';
+          const ok = await addAoCarrinho();
+          if (!ok) return;
+          // Garantir que o item está no cache antes de ir ao formulário
+          const C = window.Cart || Cart;
+          let tries = 0;
+          while (tries < 5 && C.count() < 1) {
+            await new Promise(r => setTimeout(r, 80));
+            tries++;
+          }
+          if (C.count() > 0) {
+            location.href = 'checkout.html';
+          } else {
+            // Fallback: formulário de solicitar com produto
+            location.href = 'solicitar.html?produto=' + encodeURIComponent(prod.id) +
+              (tamanho ? '&tamanho=' + encodeURIComponent(tamanho) : '') +
+              (cor ? '&cor=' + encodeURIComponent(cor) : '') +
+              '&qty=' + encodeURIComponent(qty);
+          }
+        } catch (e) {
+          alert(e.message || 'Não foi possível preparar o pedido.');
         } finally { btnN.disabled = false; }
       };
     }

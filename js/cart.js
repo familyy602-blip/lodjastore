@@ -61,7 +61,24 @@ const Cart = {
             .eq('device_id', device)
             .order('data_atualizacao', { ascending: false });
           if (error) throw error;
-          this._cache = this._mapRows(data);
+          let remote = this._mapRows(data);
+          // Merge com localStorage (itens acabados de adicionar que ainda não estão no servidor)
+          let local = [];
+          try { local = JSON.parse(localStorage.getItem('lv_carrinho') || '[]'); } catch (e) {}
+          const key = (i) => String(i.produtoId) + '|' + (i.tamanho||'') + '|' + (i.cor||'');
+          const map = {};
+          remote.forEach(i => { map[key(i)] = i; });
+          local.forEach(i => {
+            if (!i.produtoId) return;
+            const k = key(i);
+            if (!map[k]) map[k] = i;
+            else {
+              // manter quantidade maior (local recente)
+              if ((Number(i.quantidade)||0) > (Number(map[k].quantidade)||0)) map[k].quantidade = i.quantidade;
+            }
+          });
+          this._cache = Object.values(map);
+          try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
           await this._migrateLocalIfAny(db, device);
           this.updateBadge();
           return this._cache;
@@ -147,6 +164,7 @@ const Cart = {
       if (item.nome) existing.nome = item.nome;
       if (item.preco != null) existing.preco = Number(item.preco) || existing.preco;
       this.updateBadge();
+      try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
       const id = existing.id;
       const qty = existing.quantidade;
       this._bg(async () => {
@@ -176,13 +194,11 @@ const Cart = {
     };
     this._cache.unshift(localItem);
     this.updateBadge();
+    try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
 
     this._bg(async () => {
       const db = await this._remote();
-      if (!db) {
-        try { localStorage.setItem('lv_carrinho', JSON.stringify(this._cache)); } catch (e) {}
-        return;
-      }
+      if (!db) return;
       const { error } = await db.from('lv_carrinho').insert({
         id: rowId,
         device_id: device,
