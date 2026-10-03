@@ -1759,7 +1759,7 @@ const LojaDB = {
       ? ('Código enviado por ' + (canalN === 'email' ? 'email' : 'WhatsApp') + '. Verifique o telemóvel e introduza o código abaixo.')
       : (canalN === 'email'
         ? 'Não foi possível enviar o email. Confirme o endereço (FormSubmit pode pedir confirmação na 1.ª vez) ou use WhatsApp.'
-        : 'WhatsApp: configure a API Key do CallMeBot em Admin → Configurações. Sem a key, use verificação por email.') };
+        : 'Use verificação por email — é o método suportado para todos os clientes.') };
   },
 
   async validarCodigoVerificacao({ destino, codigo, finalidade }) {
