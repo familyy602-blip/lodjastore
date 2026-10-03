@@ -267,8 +267,14 @@
     function fillDials() {
       var sel = document.getElementById('rDial');
       if (!sel) return;
-      sel.innerHTML = DIALS.map(function(x){ return '<option value="'+x.d+'">'+x.n+'</option>'; }).join('');
+      // opções limpas; PhoneDial desenha as bandeiras
+      if (window.PhoneDial && PhoneDial.list) {
+        sel.innerHTML = PhoneDial.list.map(function(x){ return '<option value="'+x.d+'">+'+x.d+' '+x.n+'</option>'; }).join('');
+      } else {
+        sel.innerHTML = DIALS.map(function(x){ return '<option value="'+x.d+'">'+x.n+'</option>'; }).join('');
+      }
       sel.value = '258';
+      if (window.PhoneDial) { sel._pdDone = false; PhoneDial.enhance(sel); }
     }
     function fullPhone() {
       var dial = document.getElementById('rDial').value;
@@ -398,5 +404,6 @@
     })();
   </script>
   <script src="/lodjastore/js/chat-widget.js"></script>
+<script src="/lodjastore/js/phone-dial.js"></script>
 </body>
 </html>
