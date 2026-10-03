@@ -435,6 +435,18 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <title>Produto — LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <script>
+    (function(){try{
+      var c=localStorage.getItem('lv_settings');
+      if(!c)return;
+      var s=JSON.parse(c);
+      function apply(){
+        if(s.siteName){document.querySelectorAll('#brandName,.brand-name').forEach(function(n){n.textContent=s.siteName});}
+        if(s.logoUrl){document.querySelectorAll('#brandLogo,.brand-logo').forEach(function(i){i.onerror=function(){};i.src=s.logoUrl;i.style.display='';});}
+      }
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply);else apply();
+    }catch(e){}})();
+  </script>
 </head>
 <body>
   <div class="page-voltar">
@@ -443,7 +455,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     <header class="site-header">
     <div class="container header-inner">
       <a class="logo" href="index.html">
-        <img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" onerror="this.style.display='none'">
+        <img src="/lodjastore/logo-lodja.png" id="brandLogo" class="brand-logo" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" onerror="this.onerror=null">
         <span>
           <span id="brandName">LODJA Store</span>
         </span>

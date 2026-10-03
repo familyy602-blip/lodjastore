@@ -126,3 +126,20 @@ window.AdminAlerts = {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 };
+
+// Badge no link Mensagens do drawer
+(function(){
+  async function markMsgLinks(){
+    try {
+      if (typeof LojaDB === 'undefined') return;
+      var n = await LojaDB.countMensagensNovas();
+      document.querySelectorAll('a[href="mensagens.html"],a[href*="mensagens.html"]').forEach(function(a){
+        var base = a.textContent.replace(/\s*\d+\s*$/,'').replace(/\s*\(\d+\)\s*$/,'').trim();
+        if (n > 0) a.textContent = base + ' (' + n + ')';
+        else if (base) a.textContent = base.indexOf('Mensagens')>=0 ? base : a.textContent;
+      });
+    } catch(e){}
+  }
+  setTimeout(markMsgLinks, 1500);
+  setInterval(markMsgLinks, 20000);
+})();

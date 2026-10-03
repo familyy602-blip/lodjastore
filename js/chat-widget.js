@@ -262,6 +262,9 @@
       try {
         localStorage.setItem('lv_chat_email', profile.email || '');
         localStorage.setItem('lv_chat_tel', profile.telefone || '');
+        var base = String(profile.email || profile.telefone || 'x').replace(/[^a-z0-9]/gi, '').slice(-8);
+        profile.conversa_id = 'CHAT-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + base.toUpperCase();
+        saveProfile();
       } catch (e) {}
       step = 'ajuda';
       setPlaceholder();
@@ -281,12 +284,17 @@
         if (typeof LojaDB !== 'undefined') {
           await LojaDB.init();
           var isEmail = String(profile.contacto || '').indexOf('@') >= 0;
+          var geoPais = null;
+          try { geoPais = localStorage.getItem('lv_geo_pais'); } catch (e) {}
           await LojaDB.enviarMensagemChat({
             nome: profile.nome || 'Cliente',
             email: isEmail ? profile.contacto : (profile.email || ''),
             telefone: !isEmail ? String(profile.contacto || '').replace(/\D/g, '') : (profile.telefone || ''),
             texto: text,
-            conta_id: profile.conta_id || null
+            conta_id: profile.conta_id || null,
+            conversa_id: profile.conversa_id || null,
+            pagina: location.pathname || '',
+            pais: geoPais
           });
         }
         if (auto) await botDelay(auto, 700);

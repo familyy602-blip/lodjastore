@@ -141,7 +141,7 @@
       d.innerHTML = `
         <div>
           <strong style="font-size:16px">${esc(selected.nome)}</strong>
-          <div style="font-size:13px;color:#64748b">${esc(selected.email)} ${selected.telefone && selected.telefone!=='—' ? '· 📞 '+esc(selected.telefone) : ''}</div>
+          <div style="font-size:13px;color:#64748b">${selected.conversa_id?esc(selected.conversa_id)+" · ":""}${esc(selected.email)} ${selected.telefone && selected.telefone!=='—' ? '· 📞 '+esc(selected.telefone) : ''}</div>
           <div style="font-size:12px;color:#94a3b8;margin-top:6px">
             Enviada: ${fmt(selected.created_at)} ·
             <span class="badge-st st-${esc(selected.estado)}">${labelEstado(selected.estado)}</span>
@@ -191,6 +191,7 @@
       document.getElementById('lista').innerHTML = list.map(m => `
         <div class="msg-item ${m.estado==='nova'?'nova':''} ${selected&&selected.id===m.id?'active':''}" data-id="${m.id}" onclick="openMsg('${m.id}')">
           <div class="who">${esc(m.nome)} <span class="badge-st st-${esc(m.estado)}">${labelEstado(m.estado)}</span></div>
+          <div class="when" style="color:#7c3aed">${esc(m.conversa_id||"")}</div>
           <div class="preview">${esc(m.mensagem)}</div>
           <div class="when">${fmt(m.created_at)}</div>
         </div>`).join('') || '<p style="color:#64748b;padding:20px;text-align:center">Nenhuma mensagem.</p>';

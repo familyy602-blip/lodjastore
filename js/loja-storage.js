@@ -1261,16 +1261,31 @@ const LojaDB = {
   },
 
   // ----- CHAT / MENSAGENS -----
-  async enviarMensagemChat({ nome, email, telefone, texto, conta_id }) {
+  async enviarMensagemChat({ nome, email, telefone, texto, conta_id, conversa_id, pagina, pais }) {
+    const em = (email || '').trim().toLowerCase() || null;
+    const tel = (telefone || '').replace(/\D/g, '') || null;
+    if (!em && !tel) throw new Error('É necessário email ou WhatsApp para podermos responder');
+    const nomeLimpo = (nome || '').trim() || 'Visitante';
+    // conversa estável por contacto
+    let cid = conversa_id || null;
+    if (!cid) {
+      const base = (em || tel || 'x').replace(/[^a-z0-9]/gi, '').slice(-8);
+      const d = new Date();
+      const ymd = d.toISOString().slice(0, 10).replace(/-/g, '');
+      cid = 'CHAT-' + ymd + '-' + base.toUpperCase();
+    }
     const row = {
       id: this.genId('msg_'),
-      nome: (nome || '').trim() || 'Visitante',
-      email: (email || '').trim().toLowerCase() || null,
-      telefone: (telefone || '').replace(/\D/g, '') || null,
+      conversa_id: cid,
+      nome: nomeLimpo,
+      email: em,
+      telefone: tel,
       conta_id: conta_id || null,
       mensagem: (texto || '').trim(),
       resposta: null,
       estado: 'nova',
+      pagina: pagina || (typeof location !== 'undefined' ? location.pathname : null),
+      pais: pais || null,
       created_at: new Date().toISOString(),
       respondido_em: null
     };
@@ -1631,19 +1646,141 @@ const LojaDB = {
   },
 
   // ----- CONTAS DE CLIENTES (email) -----
-  async registarClienteConta({ nome, email, telefone, password }) {
+  /** Envia código de verificação (email via FormSubmit; WhatsApp via webhook opcional) */
+  async enviarCodigoVerificacao({ destino, canal, finalidade }) {
+    const dest = String(destino || '').trim();
+    if (!dest) throw new Error('Indique email ou telefone');
+    const canalN = canal === 'whatsapp' || (!dest.includes('@') && canal !== 'email') ? 'whatsapp' : 'email';
+    // rate limit local simples
+    const rk = 'lv_code_rl_' + dest;
+    const last = Number(sessionStorage.getItem(rk) || 0);
+    if (Date.now() - last < 60000) throw new Error('Aguarde 1 minuto antes de pedir outro código');
+    const tentativas = Number(sessionStorage.getItem(rk + '_n') || 0);
+    if (tentativas >= 5) throw new Error('Limite de envios atingido. Tente mais tarde.');
+
+    const codigo = String(Math.floor(100000 + Math.random() * 900000));
+    const row = {
+      id: this.genId('ver_'),
+      destino: canalN === 'email' ? dest.toLowerCase() : dest.replace(/\D/g, ''),
+      canal: canalN,
+      finalidade: finalidade || 'registo',
+      codigo,
+      tentativas_validacao: 0,
+      usado: false,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    };
+    if (!this._local && window.supabaseClient) {
+      try {
+        await window.supabaseClient.from('lv_verificacao').insert(row);
+      } catch (e) {
+        const list = this._getLocal('lv_verificacao');
+        list.unshift(row);
+        this._setLocal('lv_verificacao', list.slice(0, 100));
+      }
+    } else {
+      const list = this._getLocal('lv_verificacao');
+      list.unshift(row);
+      this._setLocal('lv_verificacao', list.slice(0, 100));
+    }
+
+    const texto = 'LODJA / ' + (await this.getSettings().then(s => s.siteName || 'Loja').catch(() => 'Loja')) +
+      ' — o seu código é ' + codigo + ' (válido 15 minutos). Não partilhe este código.';
+
+    let enviado = false;
+    if (canalN === 'email') {
+      try {
+        const res = await fetch('https://formsubmit.co/ajax/' + encodeURIComponent(dest.toLowerCase()), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            _subject: 'Código de verificação — ' + (row.finalidade),
+            message: texto,
+            _template: 'table'
+          })
+        });
+        if (res.ok) enviado = true;
+      } catch (e) { console.warn('email send', e); }
+    } else {
+      // WhatsApp: webhook configurável nas settings (ex. CallMeBot / API própria)
+      try {
+        const s = await this.getSettings();
+        const url = s.whatsappCodeWebhook || s.smsWebhook || '';
+        if (url) {
+          const u = url.replace('{phone}', row.destino).replace('{text}', encodeURIComponent(texto)).replace('{code}', codigo);
+          const res = await fetch(u, { method: s.whatsappWebhookMethod || 'GET' });
+          if (res.ok) enviado = true;
+        }
+      } catch (e) { console.warn('wa send', e); }
+    }
+
+    sessionStorage.setItem(rk, String(Date.now()));
+    sessionStorage.setItem(rk + '_n', String(tentativas + 1));
+
+    // Nunca devolver o código ao cliente no browser
+    return { ok: true, canal: canalN, enviado, destino: row.destino, mensagem: enviado
+      ? ('Código enviado por ' + (canalN === 'email' ? 'email' : 'WhatsApp') + '. Verifique e introduza abaixo.')
+      : (canalN === 'email'
+        ? 'Não foi possível enviar o email automaticamente. Confirme o endereço ou tente WhatsApp. Se configurou FormSubmit, confirme o email uma vez no site formsubmit.co.'
+        : 'WhatsApp automático requer webhook nas Configurações (whatsappCodeWebhook). Contacte a loja ou use email.') };
+  },
+
+  async validarCodigoVerificacao({ destino, codigo, finalidade }) {
+    const dest = String(destino || '').trim();
+    const code = String(codigo || '').trim();
+    if (!dest || !code) throw new Error('Indique destino e código');
+    const key = dest.includes('@') ? dest.toLowerCase() : dest.replace(/\D/g, '');
+    let list = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data } = await window.supabaseClient.from('lv_verificacao').select('*').eq('destino', key).order('created_at', { ascending: false }).limit(10);
+        list = data || [];
+      } catch (e) {
+        list = this._getLocal('lv_verificacao').filter(r => r.destino === key);
+      }
+    } else {
+      list = this._getLocal('lv_verificacao').filter(r => r.destino === key);
+    }
+    const now = Date.now();
+    const rec = list.find(r =>
+      r.codigo === code &&
+      !r.usado &&
+      new Date(r.expires_at).getTime() > now &&
+      (!finalidade || r.finalidade === finalidade)
+    );
+    if (!rec) {
+      // increment attempts on latest
+      throw new Error('Código inválido ou expirado');
+    }
+    if (!this._local && window.supabaseClient) {
+      try { await window.supabaseClient.from('lv_verificacao').update({ usado: true }).eq('id', rec.id); } catch (e) {}
+    } else {
+      const all = this._getLocal('lv_verificacao');
+      const i = all.findIndex(r => r.id === rec.id);
+      if (i >= 0) { all[i].usado = true; this._setLocal('lv_verificacao', all); }
+    }
+    return true;
+  },
+
+  async registarClienteConta({ nome, email, telefone, password, emailVerificado, telefoneVerificado, dialCode }) {
     email = (email || '').trim().toLowerCase();
     if (!email || !password) throw new Error('Email e palavra-passe obrigatórios');
+    if (!emailVerificado) throw new Error('Confirme o email com o código enviado');
+    const telDigits = String(telefone || '').replace(/\D/g, '');
+    if (telDigits && !telefoneVerificado) throw new Error('Confirme o telefone com o código enviado');
     const id = this.genId('cta_');
-    // hash simples (não é bcrypt — suficiente para painel interno; cliente não é admin)
     const pass_hash = btoa(unescape(encodeURIComponent(password + '|lodja'))).slice(0, 64);
     const row = {
       id,
-      nome: (nome || '').trim(),
+      nome: (nome || '').trim() || 'Cliente',
       email,
-      telefone: (telefone || '').replace(/\D/g, ''),
+      telefone: telDigits,
+      dial_code: dialCode || null,
       pass_hash,
+      email_verificado: !!emailVerificado,
+      telefone_verificado: !!telefoneVerificado,
       estado: 'activo',
+      acessos: 0,
       data_criacao: new Date().toISOString()
     };
     if (!this._local && window.supabaseClient) {
@@ -1657,7 +1794,8 @@ const LojaDB = {
       list.unshift(row);
       this._setLocal('lv_contas_clientes', list);
     }
-    sessionStorage.setItem('lv_cliente_sessao', JSON.stringify({ id, email, nome: row.nome, telefone: row.telefone }));
+    const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone };
+    sessionStorage.setItem('lv_cliente_sessao', JSON.stringify(sess));
     return row;
   },
 
@@ -1709,70 +1847,45 @@ const LojaDB = {
     if (isEmail) row = contas.find(c => (c.email || '').toLowerCase() === email);
     else row = contas.find(c => String(c.telefone || '').replace(/\D/g, '') === telefone || String(c.telefone || '').replace(/\D/g, '').endsWith(telefone));
     if (!row) throw new Error('Conta não encontrada com esses dados');
-    const codigo = String(Math.floor(100000 + Math.random() * 900000));
-    const rec = {
-      id: this.genId('rec_'),
+    const canal = isEmail ? 'email' : 'whatsapp';
+    const destino = isEmail ? row.email : (row.telefone || telefone);
+    const envio = await this.enviarCodigoVerificacao({
+      destino,
+      canal,
+      finalidade: 'recuperacao'
+    });
+    return {
+      email: row.email,
+      telefone: row.telefone,
+      nome: row.nome,
       conta_id: row.id,
-      email: row.email || email,
-      telefone: row.telefone || telefone,
-      codigo: codigo,
-      usado: false,
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      canal,
+      enviado: envio.enviado,
+      mensagem: envio.mensagem
     };
-    if (!this._local && window.supabaseClient) {
-      try {
-        await window.supabaseClient.from('lv_recuperacao').insert(rec);
-      } catch (e) {
-        const list = this._getLocal('lv_recuperacao');
-        list.unshift(rec);
-        this._setLocal('lv_recuperacao', list.slice(0, 50));
-      }
-    } else {
-      const list = this._getLocal('lv_recuperacao');
-      list.unshift(rec);
-      this._setLocal('lv_recuperacao', list.slice(0, 50));
-    }
-    return { codigo, email: row.email, telefone: row.telefone, nome: row.nome, conta_id: row.id };
   },
 
   async redefinirPasswordComCodigo({ contacto, codigo, novaPassword }) {
     const raw = String(contacto || '').trim();
-    const isEmail = raw.includes('@');
-    const email = isEmail ? raw.toLowerCase() : null;
-    const telefone = !isEmail ? raw.replace(/\D/g, '') : null;
-    let list = [];
-    if (!this._local && window.supabaseClient) {
-      try {
-        const { data } = await window.supabaseClient.from('lv_recuperacao').select('*').order('created_at', { ascending: false }).limit(30);
-        list = data || [];
-      } catch (e) {
-        list = this._getLocal('lv_recuperacao');
-      }
-    } else list = this._getLocal('lv_recuperacao');
-    const now = Date.now();
-    const rec = list.find(r =>
-      r.codigo === String(codigo).trim() &&
-      !r.usado &&
-      new Date(r.expires_at).getTime() > now &&
-      ((email && (r.email || '').toLowerCase() === email) || (telefone && String(r.telefone || '').replace(/\D/g, '') === telefone))
-    );
-    if (!rec) throw new Error('Código inválido ou expirado');
     if (!novaPassword || String(novaPassword).length < 4) throw new Error('Nova palavra-passe demasiado curta');
+    await this.validarCodigoVerificacao({ destino: raw, codigo, finalidade: 'recuperacao' });
+    const isEmail = raw.includes('@');
+    const contas = await this.getContasClientes();
+    let row = null;
+    if (isEmail) row = contas.find(c => (c.email || '').toLowerCase() === raw.toLowerCase());
+    else {
+      const tel = raw.replace(/\D/g, '');
+      row = contas.find(c => String(c.telefone || '').replace(/\D/g, '') === tel || String(c.telefone || '').replace(/\D/g, '').endsWith(tel));
+    }
+    if (!row) throw new Error('Conta não encontrada');
     const pass_hash = btoa(unescape(encodeURIComponent(novaPassword + '|lodja'))).slice(0, 64);
     if (!this._local && window.supabaseClient) {
-      const { error } = await window.supabaseClient.from('lv_contas_clientes').update({ pass_hash }).eq('id', rec.conta_id);
+      const { error } = await window.supabaseClient.from('lv_contas_clientes').update({ pass_hash }).eq('id', row.id);
       if (error) throw error;
-      try {
-        await window.supabaseClient.from('lv_recuperacao').update({ usado: true }).eq('id', rec.id);
-      } catch (e) {}
     } else {
-      const contas = this._getLocal('lv_contas_clientes');
-      const i = contas.findIndex(c => c.id === rec.conta_id);
-      if (i >= 0) { contas[i].pass_hash = pass_hash; this._setLocal('lv_contas_clientes', contas); }
-      const recs = this._getLocal('lv_recuperacao');
-      const j = recs.findIndex(r => r.id === rec.id);
-      if (j >= 0) { recs[j].usado = true; this._setLocal('lv_recuperacao', recs); }
+      const list = this._getLocal('lv_contas_clientes');
+      const i = list.findIndex(c => c.id === row.id);
+      if (i >= 0) { list[i].pass_hash = pass_hash; this._setLocal('lv_contas_clientes', list); }
     }
     return true;
   },
