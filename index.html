@@ -469,27 +469,6 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     }catch(e){}})();
   </script>
   <link rel="icon" href="/lodjastore/logo-lodja.png">
-
-    <script>
-      (function(){
-        try {
-          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
-          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
-          if (!logo) return;
-          function setFav(href) {
-            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
-            if (!links.length) {
-              var l = document.createElement('link');
-              l.rel = 'icon';
-              document.head.appendChild(l);
-              links = [l];
-            }
-            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
-          }
-          setFav(logo);
-        } catch(e) {}
-      })();
-    </script>
 </head>
 <body>
     <header class="site-header">
@@ -551,7 +530,6 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         <p>Explore o catálogo, escolha tamanhos e cores, peça em minutos e acompanhe a sua encomenda.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="catalogo.html">🛍 Ver produtos →</a>
-          <a class="btn btn-outline" href="conta.html" style="margin-left:8px">👤 Conta / Entrar</a>
           <a class="btn btn-outline" id="btnBonus" href="#" style="display:none">Bónus Especial →</a>
         </div>
       </div>
