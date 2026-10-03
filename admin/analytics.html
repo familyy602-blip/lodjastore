@@ -25,7 +25,7 @@
       display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px;
     }
     @media(min-width:700px){ .ia-kpis { grid-template-columns:repeat(3,1fr); } }
-    @media(min-width:1000px){ .ia-kpis { grid-template-columns:repeat(6,1fr); } }
+    @media(min-width:700px){ .ia-kpis { grid-template-columns:repeat(2,1fr); max-width:420px; } }
     .ia-kpi {
       background:#2a2740; border-radius:12px; padding:14px 12px;
     }
@@ -162,27 +162,19 @@
     <div class="ia-grid">
       <div class="ia-card">
         <h3>Páginas mais vistas</h3>
-        <p class="hint">Visualizações por URL</p>
+        <p class="hint">Onde os visitantes passam mais tempo</p>
         <div id="topPages"></div>
       </div>
       <div class="ia-card">
-        <h3>Geográfico · Países</h3>
-        <p class="hint">De onde acedem à loja</p>
-        <div id="topPais"></div>
-        <h3 style="margin:18px 0 8px;font-size:14px">Regiões</h3>
-        <div id="topRegiao"></div>
-        <h3 style="margin:18px 0 8px;font-size:14px">Cidades</h3>
-        <div id="topCidade"></div>
-      </div>
-      <div class="ia-card">
         <h3>Clientes com conta</h3>
-        <p class="hint">Quem visitou com sessão iniciada</p>
+        <p class="hint">Visitantes autenticados neste período</p>
+        <div style="margin-bottom:10px">
+          <select id="filtroClientes" class="adm-input" style="max-width:220px" onchange="paint()">
+            <option value="todos">Todos com conta</option>
+            <option value="activos">Com mais visitas</option>
+          </select>
+        </div>
         <div id="topClientes"></div>
-      </div>
-      <div class="ia-card">
-        <h3>Referenciadores</h3>
-        <p class="hint">Origem do tráfego</p>
-        <div id="topRef"></div>
       </div>
     </div>
 
@@ -259,11 +251,7 @@
       const n = (v, d) => (v == null || v === '' || v === 'undefined' || Number.isNaN(v)) ? d : v;
       document.getElementById('kpis').innerHTML = `
         <div class="ia-kpi"><div class="n">${n(rawV.visitantesUnicos, 0)}</div><div class="l">Visitantes</div></div>
-        <div class="ia-kpi"><div class="n">${n(rawV.totalVisitas, 0)}</div><div class="l">Visualizações</div></div>
-        <div class="ia-kpi"><div class="n">${n(rawV.sessoes, 0)}</div><div class="l">Sessões</div></div>
-        <div class="ia-kpi"><div class="n">${n(rawV.avgSessionLabel, '00:00')}</div><div class="l">Duração média</div></div>
-        <div class="ia-kpi"><div class="n">${n(rawV.bounceRate, 0)}%</div><div class="l">Taxa de rejeição</div></div>
-        <div class="ia-kpi"><div class="n">${n(rawV.viewsPerSession, 0)}</div><div class="l">Views / sessão</div></div>`;
+        <div class="ia-kpi"><div class="n">${n(rawV.totalVisitas, 0)}</div><div class="l">Visualizações</div></div>`;
 
       const serie = rawV.serieDiaria || [];
       const ctx = document.getElementById('chartMain').getContext('2d');
@@ -307,51 +295,33 @@
         }
       });
 
-      document.getElementById('topPages').innerHTML = rowsList(
-        (rawV.porPagina || []).slice(0, 12),
-        x => shortPage(x[0]),
-        x => x[1],
-        x => x[0]
-      );
-      {
-        const paises = (rawV.porPais || []).filter(x => x && x[0] && x[0] !== 'undefined');
-        const cidades = {};
-        (rawV.recentes || rawV.lista || []).forEach(function(r){
-          var c = r.cidade; if(!c||c==='undefined') c = r.regiao; if(!c||c==='undefined') return;
-          cidades[c]=(cidades[c]||0)+1;
-        });
-        const topCid = Object.entries(cidades).sort((a,b)=>b[1]-a[1]).slice(0,12);
-        const total = rawV.totalVisitas || 1;
-        const regios = (rawV.porRegiao || []).filter(x => x && x[0] && x[0] !== 'undefined');
-        const cidadesL = (rawV.porCidade || []).filter(x => x && x[0] && x[0] !== 'undefined');
-        var regBox = document.getElementById('topRegiao');
-        if (regBox) regBox.innerHTML = regios.length ? regios.slice(0,10).map(function(x){
-          return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0"><span>📍 '+esc(x[0])+'</span><strong>'+x[1]+'</strong></div>';
-        }).join('') : '<p style="color:#64748b;font-size:13px">Sem dados de região ainda. As novas visitas gravarão região/cidade via IP.</p>';
-        var cidBox = document.getElementById('topCidade');
-        if (cidBox) cidBox.innerHTML = cidadesL.length ? cidadesL.slice(0,10).map(function(x){
-          return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e8f0"><span>🏙️ '+esc(x[0])+'</span><strong>'+x[1]+'</strong></div>';
-        }).join('') : '<p style="color:#64748b;font-size:13px">Sem cidades registadas ainda.</p>';
-        document.getElementById('topPais').innerHTML = paises.length ? `
-          <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;font-size:13px;font-weight:700;color:#64748b;margin-bottom:8px">
-            <span>País</span><span>Visitas</span><span>%</span>
-          </div>
-          ${paises.slice(0,12).map(([pais,n]) => `
-            <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;align-items:center">
-              <span>${flagForPais(pais)} ${esc(pais||'Não identificado')}</span>
-              <strong>${n}</strong>
-              <span style="color:#7c3aed;font-weight:800">${Math.round(n/total*1000)/10}%</span>
-            </div>`).join('')}
-        ` : '<p style="color:#64748b;font-size:13px">Sem dados de país ainda. Os próximos acessos registarão a localização.</p>';
-      }
-      document.getElementById('topClientes').innerHTML = rowsList(
-        rawV.topClientes || [],
-        x => x.nome || x.email || x.conta_id || 'Cliente',
-        x => x.visitas + ' views',
-        x => (x.email || '') + (x.devices ? ' · ' + x.devices + ' disp.' : '')
-      );
-      document.getElementById('topRef').innerHTML = bars((rawV.porReferrer || []).slice(0, 10));
 
+      // Páginas mais vistas
+      var elPages = document.getElementById('topPages');
+      if (elPages) {
+        elPages.innerHTML = rowsList(
+          (rawV.porPagina || []).slice(0, 12),
+          x => shortPage(x[0]),
+          x => x[1],
+          x => x[0]
+        );
+      }
+
+      // Clientes com conta (filtro)
+      var elCli = document.getElementById('topClientes');
+      if (elCli) {
+        var list = (rawV.topClientes || []).filter(function(x){ return x && (x.email || x.conta_id || x.nome); });
+        if (!list.length) {
+          elCli.innerHTML = '<p style="color:#64748b;font-size:13px">Ainda sem clientes com conta a visitar neste período.</p>';
+        } else {
+          elCli.innerHTML = rowsList(
+            list,
+            x => x.nome || x.email || x.conta_id || 'Cliente',
+            x => (x.visitas || 0) + ' views',
+            x => (x.email || '') + (x.devices ? ' · ' + x.devices + ' disp.' : '')
+          );
+        }
+      }
       if (rawC) {
         document.getElementById('cartBlock').innerHTML = `
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px">
