@@ -43,7 +43,7 @@
     </div>
   </div>
   <div class="adm-shell">
-    <a class="adm-back" href="index.html">← Voltar</a>
+    <a class="adm-back" href="#" onclick="if(history.length>1){history.back()}else{location.href='index.html'};return false">← Voltar</a>
     <div class="adm-page-head">
       <div class="ico">⚙️</div>
       <div><h1>Configurações</h1><p>Definições da loja e do sistema.</p></div>
@@ -67,7 +67,18 @@
         <div class="form-group"><label><input type="checkbox" id="syncClientes"> Permitir registar clientes no LODJA v1</label></div>
         <div class="form-group"><label><input type="checkbox" id="mostrarBonus"> Mostrar Bónus Especial (só se activo no LODJA v1)</label></div>
         <button class="btn btn-primary" type="submit">💾 Guardar</button>
-      </form>
+      
+      <div class="form-group" style="margin-top:16px">
+        <label>Atraso da notificação ao cliente (chat)</label>
+        <select class="form-control" id="chatNotifDelay">
+          <option value="0">Imediato</option>
+          <option value="15">15 minutos</option>
+          <option value="30">30 minutos</option>
+          <option value="60">1 hora</option>
+        </select>
+        <small style="color:#64748b;font-size:12px">Quando responde no chat, o cliente vê a notificação após este intervalo.</small>
+      </div>
+</form>
     
   </div>
   <nav class="adm-bottom">
@@ -97,6 +108,7 @@
       document.getElementById('syncCompras').checked = s.syncComprasLodja !== false;
       document.getElementById('syncClientes').checked = s.syncClientesLodja !== false;
       document.getElementById('mostrarBonus').checked = s.mostrarBonusEspecial !== false;
+      if (document.getElementById('chatNotifDelay')) document.getElementById('chatNotifDelay').value = String(s.chatNotifDelayMin != null ? s.chatNotifDelayMin : 0);
       if (s.logoUrl) {
         const src = (s.logoUrl.startsWith('data:') || s.logoUrl.startsWith('http')) ? s.logoUrl : '../' + s.logoUrl;
         document.getElementById('logoPrev').src = src;
@@ -109,7 +121,8 @@
         whatsapp: document.getElementById('whatsapp').value.replace(/\D/g, ''),
         syncComprasLodja: document.getElementById('syncCompras').checked,
         syncClientesLodja: document.getElementById('syncClientes').checked,
-        mostrarBonusEspecial: document.getElementById('mostrarBonus').checked
+        mostrarBonusEspecial: document.getElementById('mostrarBonus').checked,
+        chatNotifDelayMin: Number(document.getElementById('chatNotifDelay')?.value || 0)
       };
       const pass = document.getElementById('adminPassword').value;
       if (pass) patch.adminPassword = pass;

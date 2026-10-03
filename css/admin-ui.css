@@ -202,7 +202,12 @@ body.admin-pro.no-bottom { padding-bottom: 16px; }
   background: #0b1220; color: #fff; padding: 20px 14px;
   display: flex; flex-direction: column; gap: 4px;
   box-shadow: 8px 0 32px rgba(0,0,0,.3);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
+.adm-drawer .panel a { flex-shrink: 0; }
 .adm-drawer .panel a {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 12px; border-radius: 12px; color: #cbd5e1; font-weight: 600;

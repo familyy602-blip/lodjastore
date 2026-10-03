@@ -8,13 +8,30 @@
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
   <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    .stat-mini { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin: 10px 0; }
-    @media(min-width:600px){ .stat-mini { grid-template-columns: repeat(4,1fr); } }
-    .stat-mini div { background:#f8fafc; border-radius:12px; padding:10px; text-align:center; }
-    .stat-mini strong { display:block; font-size:1.2rem; color:#4f46e5; }
-    .detail-box { display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+    .ia-wrap { background:#1e1b2e; color:#e2e8f0; border-radius:16px; padding:16px; margin-bottom:16px; }
+    .ia-top { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+    .ia-top h2 { margin:0; flex:1; font-size:1.2rem; color:#fff; }
+    .ia-period button {
+      background:#2d2a3e; color:#c4b5fd; border:1px solid #3f3b52;
+      border-radius:8px; padding:7px 11px; font-size:12px; font-weight:700; cursor:pointer; margin:2px;
+    }
+    .ia-period button.active { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+    .ia-kpis { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
+    @media(min-width:700px){ .ia-kpis { grid-template-columns:repeat(3,1fr); } }
+    @media(min-width:1000px){ .ia-kpis { grid-template-columns:repeat(5,1fr); } }
+    .ia-kpi { background:#2a2740; border-radius:12px; padding:14px 12px; }
+    .ia-kpi .n { font-size:1.4rem; font-weight:800; color:#fff; }
+    .ia-kpi .l { font-size:11px; color:#a78bfa; margin-top:6px; font-weight:600; text-transform:uppercase; }
+    .ia-chart { position:relative; height:220px; background:#2a2740; border-radius:12px; padding:12px; }
+    .card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px; margin-bottom:12px; }
+    .detail-box { display:none; margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0; }
     .detail-box.open { display:block; }
+    .stat-mini { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin:10px 0; }
+    @media(min-width:600px){ .stat-mini { grid-template-columns:repeat(3,1fr); } }
+    .stat-mini div { background:#f8fafc; border-radius:12px; padding:10px; text-align:center; }
+    .stat-mini strong { display:block; font-size:1.15rem; color:#7c3aed; }
   </style>
 </head>
 <body class="admin-pro">
@@ -22,10 +39,11 @@
     <div class="adm-top-row">
       <div class="adm-brand">
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
-        <div><strong>Clientes</strong><small>Contas registadas no site</small></div>
+        <div><strong>Clientes</strong><small>Contas e actividade</small></div>
       </div>
       <div class="adm-top-actions">
-        <a class="adm-icon-btn" href="analytics.html" title="Visitantes">👁</a>
+        <a class="adm-icon-btn" href="mensagens.html">💬</a>
+        <a class="adm-icon-btn" href="analytics.html">👁</a>
         <a class="adm-icon-btn" href="index.html">🏠</a>
       </div>
     </div>
@@ -36,6 +54,7 @@
       <a href="index.html">📊 Dashboard</a>
       <a href="analytics.html">👁 Visitantes</a>
       <a href="clientes.html" class="active">👥 Clientes registados</a>
+      <a href="mensagens.html">💬 Mensagens</a>
       <a href="produtos.html">👕 Produtos</a>
       <a href="categorias.html">📂 Categorias</a>
       <a href="fornecedores.html">🏭 Fornecedores</a>
@@ -49,23 +68,33 @@
     </div>
   </div>
   <div class="adm-shell">
-    <a class="adm-back" href="index.html">← Voltar</a>
-    <div class="adm-page-head">
-      <div class="ico">👥</div>
-      <div>
-        <h1>Clientes registados</h1>
-        <p>Contas criadas no site (email). Veja acessos e desempenho de cada um.</p>
-      </div>
-    </div>
-    <div class="adm-actions-row">
+    <a class="adm-back" href="#" onclick="if(history.length>1){history.back()}else{location.href='index.html'};return false">← Voltar</a>
+    <div class="adm-actions-row" style="margin-bottom:12px">
       <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
-      <a class="adm-btn adm-btn-ghost" href="analytics.html">👁 Estatísticas gerais</a>
+      <a class="adm-btn adm-btn-ghost" href="analytics.html">👁 Visitantes</a>
+      <a class="adm-btn adm-btn-ghost" href="mensagens.html">💬 Mensagens</a>
     </div>
-    <div class="adm-toolbar">
-      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Nome, email ou telefone…" oninput="render()"></div>
+
+    <div class="ia-wrap">
+      <div class="ia-top">
+        <h2>Clientes registados</h2>
+        <div class="ia-period" id="periods">
+          <button type="button" data-d="1">Hoje</button>
+          <button type="button" data-d="7">7 dias</button>
+          <button type="button" class="active" data-d="30">30 dias</button>
+          <button type="button" data-d="0">Todo o período</button>
+        </div>
+      </div>
+      <div class="ia-kpis" id="kpis"></div>
+      <div class="ia-chart"><canvas id="chartCli"></canvas></div>
     </div>
-    <div id="resumo" class="stat-mini"></div>
-    <div id="lista"></div>
+
+    <div class="card">
+      <div class="adm-toolbar">
+        <div class="adm-search"><span>🔍</span><input id="q" placeholder="Nome, email ou telefone…" oninput="renderList()"></div>
+      </div>
+      <div id="lista"></div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/lodjastore/js/supabase-config.js"></script>
@@ -73,74 +102,123 @@
   <script src="/lodjastore/js/loja-storage.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
-    let todos = [];
+    let todos = [], msgs = [], periodDays = 30, chart = null;
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
-    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    function esc(s){ return String(s==null||s===''?'—':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
     function fmtDate(iso){
       if (!iso) return '—';
-      try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return iso; }
+      try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return '—'; }
     }
+    function inPeriod(iso) {
+      if (periodDays === 0) return true;
+      if (!iso) return false;
+      return Date.now() - new Date(iso).getTime() <= periodDays * 86400000;
+    }
+    document.getElementById('periods').onclick = (e) => {
+      const b = e.target.closest('button[data-d]');
+      if (!b) return;
+      periodDays = Number(b.dataset.d);
+      document.querySelectorAll('#periods button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      paint();
+      renderList();
+    };
     async function abrirDetalhe(id) {
       const box = document.getElementById('det_'+id);
       if (!box) return;
       if (box.classList.contains('open')) { box.classList.remove('open'); return; }
       document.querySelectorAll('.detail-box.open').forEach(el => el.classList.remove('open'));
       box.classList.add('open');
-      box.innerHTML = '<p style="color:#64748b">A carregar estatísticas…</p>';
+      box.innerHTML = '<p style="color:#64748b">A carregar…</p>';
       const c = todos.find(x => x.id === id);
       try {
         const st = await LojaDB.getEstatisticasContaCliente(c);
+        const mCli = msgs.filter(m =>
+          (c.email && m.email === c.email) || (c.telefone && m.telefone === String(c.telefone).replace(/\D/g,''))
+        );
         box.innerHTML = `
           <div class="stat-mini">
-            <div><strong>${st.acessosLogin}</strong>Logins</div>
-            <div><strong>${st.visitasPaginas}</strong>Visitas a páginas</div>
-            <div><strong>${st.visitasHoje}</strong>Visitas hoje</div>
-            <div><strong>${st.visitasSemana}</strong>Visitas (7 dias)</div>
-            <div><strong>${st.numPedidos}</strong>Pedidos</div>
-            <div><strong>${LojaDB.formatMT(st.totalGasto)}</strong>Total gasto</div>
+            <div><strong>${st.acessosLogin||0}</strong>Logins</div>
+            <div><strong>${st.visitasPaginas||0}</strong>Visitas páginas</div>
+            <div><strong>${st.visitasHoje||0}</strong>Visitas hoje</div>
+            <div><strong>${st.numPedidos||0}</strong>Pedidos</div>
+            <div><strong>${LojaDB.formatMT(st.totalGasto||0)}</strong>Total gasto</div>
+            <div><strong>${mCli.length}</strong>Mensagens</div>
           </div>
           <p style="font-size:13px;color:#64748b">Último acesso: ${fmtDate(st.ultimoAcesso || c.ultimo_acesso)}</p>
-          <h4 style="margin:10px 0 6px">Páginas mais vistas</h4>
-          ${(st.paginas||[]).map(([p,n]) => `<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #f1f5f9">${esc(p)} · <strong>${n}</strong></div>`).join('') || '<p style="color:#64748b;font-size:13px">Sem visitas registadas com sessão.</p>'}
-          <h4 style="margin:12px 0 6px">Pedidos recentes</h4>
-          ${(st.pedidos||[]).slice(0,5).map(p => `<div style="font-size:13px;padding:4px 0">${esc(p.numero_pedido||p.id)} · ${LojaDB.formatMT(p.total)} · ${esc(p.estado)}</div>`).join('') || '<p style="color:#64748b;font-size:13px">Sem pedidos.</p>'}
+          <h4 style="margin:10px 0 6px">Páginas</h4>
+          ${(st.paginas||[]).map(([p,n]) => `<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #f1f5f9">${esc(p)} · <strong>${n}</strong></div>`).join('') || '<p style="color:#64748b;font-size:13px">—</p>'}
         `;
       } catch (e) {
-        box.innerHTML = '<p style="color:#b91c1c">Erro: '+(e.message||e)+'</p>';
+        box.innerHTML = '<p style="color:#b91c1c">Erro ao carregar</p>';
       }
     }
-    function render() {
+    function paint() {
+      const novos = todos.filter(c => inPeriod(c.data_criacao));
+      const activos = todos.filter(c => (Number(c.acessos)||0) > 0 || c.ultimo_acesso);
+      const mPeriod = msgs.filter(m => inPeriod(m.created_at));
+      document.getElementById('kpis').innerHTML = `
+        <div class="ia-kpi"><div class="n">${todos.length}</div><div class="l">Registados</div></div>
+        <div class="ia-kpi"><div class="n">${novos.length}</div><div class="l">Novos (período)</div></div>
+        <div class="ia-kpi"><div class="n">${activos.length}</div><div class="l">Com actividade</div></div>
+        <div class="ia-kpi"><div class="n">${mPeriod.length}</div><div class="l">Mensagens</div></div>
+        <div class="ia-kpi"><div class="n">${todos.reduce((s,c)=>s+(Number(c.acessos)||0),0)}</div><div class="l">Logins totais</div></div>`;
+
+      // chart novos por dia (últimos 14 ou período)
+      const days = periodDays === 0 ? 30 : Math.min(periodDays, 30);
+      const labels = [], data = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+        const key = d.toISOString().slice(0,10);
+        labels.push(d.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'}));
+        data.push(todos.filter(c => (c.data_criacao||'').slice(0,10) === key).length);
+      }
+      const ctx = document.getElementById('chartCli').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{ label: 'Novos clientes', data, backgroundColor: '#7c3aed', borderRadius: 4 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#c4b5fd' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8', maxTicksLimit: 8, font:{size:10} }, grid: { color: 'rgba(255,255,255,.04)' } },
+            y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,.06)' } }
+          }
+        }
+      });
+    }
+    function renderList() {
       const q = (document.getElementById('q').value||'').toLowerCase().trim();
-      let list = todos;
+      let list = todos.slice();
       if (q) list = list.filter(c =>
         (c.nome||'').toLowerCase().includes(q) ||
         (c.email||'').toLowerCase().includes(q) ||
-        (c.telefone||'').includes(q)
+        String(c.telefone||'').includes(q)
       );
-      const totalAcessos = todos.reduce((s,c)=>s+(Number(c.acessos)||0),0);
-      document.getElementById('resumo').innerHTML = `
-        <div><strong>${todos.length}</strong>Contas</div>
-        <div><strong>${totalAcessos}</strong>Logins no total</div>
-        <div><strong>${list.length}</strong>Na lista filtrada</div>
-        <div><strong>${todos.filter(c=>c.estado!=='inactivo').length}</strong>Activas</div>`;
       document.getElementById('lista').innerHTML = list.map(c => `
-        <article class="adm-card">
+        <article style="border-bottom:1px solid #f1f5f9;padding:12px 0">
           <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
             <div>
-              <strong style="font-size:16px">${esc(c.nome||'Sem nome')}</strong>
+              <strong style="font-size:15px">${esc(c.nome||'Sem nome')}</strong>
               <div class="meta">${esc(c.email)}</div>
-              <div class="meta">${c.telefone ? '📞 '+esc(c.telefone) : ''} · Registo: ${fmtDate(c.data_criacao)}</div>
+              <div class="meta">${c.telefone ? '📞 '+esc(c.telefone) : '—'} · Registo: ${fmtDate(c.data_criacao)}</div>
               <div class="meta">Logins: <strong>${Number(c.acessos)||0}</strong> · Último: ${fmtDate(c.ultimo_acesso)}</div>
             </div>
-            <button type="button" class="adm-btn adm-btn-primary adm-btn-sm" onclick="abrirDetalhe('${c.id}')">Ver estatísticas</button>
+            <button type="button" class="adm-btn adm-btn-primary adm-btn-sm" onclick="abrirDetalhe('${c.id}')">Estatísticas</button>
           </div>
           <div class="detail-box" id="det_${c.id}"></div>
         </article>
-      `).join('') || '<p style="text-align:center;color:#64748b;padding:28px">Nenhum cliente registado ainda. Os clientes criam conta em Conta no site.</p>';
+      `).join('') || '<p style="text-align:center;color:#64748b;padding:24px">Nenhum cliente registado.</p>';
     }
     async function load() {
       todos = await LojaDB.getContasClientes();
-      render();
+      try { msgs = await LojaDB.getMensagensChat(); } catch(e) { msgs = []; }
+      paint();
+      renderList();
     }
     (async () => {
       initSupabase();

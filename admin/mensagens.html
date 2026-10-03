@@ -10,29 +10,40 @@
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <style>
     .msg-layout { display:grid; gap:12px; }
-    @media(min-width:800px){ .msg-layout { grid-template-columns: 1fr 1.1fr; min-height: 60vh; } }
+    @media(min-width:800px){ .msg-layout { grid-template-columns: 1fr 1.15fr; min-height: 60vh; } }
     .msg-list { max-height: 70vh; overflow-y:auto; }
     .msg-item {
       background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:14px;
-      padding:12px; margin-bottom:8px; cursor:pointer; transition:.15s;
+      padding:12px; margin-bottom:8px; cursor:pointer;
     }
     .msg-item:hover, .msg-item.active { border-color:#7c3aed; box-shadow:0 4px 14px rgba(124,58,237,.12); }
     .msg-item.nova { border-left:4px solid #ef4444; }
     .msg-item .who { font-weight:800; font-size:14px; }
     .msg-item .preview { color:#64748b; font-size:13px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .msg-item .when { font-size:11px; color:#94a3b8; margin-top:6px; }
+    .badge-st {
+      display:inline-block; font-size:10px; font-weight:800; padding:2px 8px; border-radius:99px;
+      text-transform:uppercase;
+    }
+    .st-nova { background:#fef2f2; color:#b91c1c; }
+    .st-em_analise { background:#fff7ed; color:#c2410c; }
+    .st-respondida { background:#ecfdf5; color:#047857; }
+    .st-lida { background:#f1f5f9; color:#475569; }
+    .st-nao_lida { background:#fef3c7; color:#b45309; }
     .msg-detail {
       background:#fff; border:1px solid var(--border,#e2e8f0); border-radius:16px; padding:16px;
       display:flex; flex-direction:column; min-height:320px;
     }
-    .bubble {
-      max-width:90%; padding:10px 14px; border-radius:14px; margin:8px 0; font-size:14px; line-height:1.45;
-    }
+    .bubble { max-width:90%; padding:10px 14px; border-radius:14px; margin:8px 0; font-size:14px; line-height:1.45; }
     .bubble.in { background:#f1f5f9; align-self:flex-start; border-bottom-left-radius:4px; }
     .bubble.out { background:#7c3aed; color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
     .msg-thread { flex:1; overflow-y:auto; display:flex; flex-direction:column; padding:8px 0; }
-    .msg-reply { display:flex; gap:8px; margin-top:12px; }
-    .msg-reply textarea { flex:1; border-radius:12px; border:1px solid #e2e8f0; padding:10px; font:inherit; min-height:70px; resize:vertical; }
+    .msg-reply { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+    .msg-reply textarea { flex:1; min-width:180px; border-radius:12px; border:1px solid #e2e8f0; padding:10px; font:inherit; min-height:70px; }
+    .kpi-row { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+    @media(min-width:600px){ .kpi-row { grid-template-columns:repeat(4,1fr); } }
+    .kpi-row div { background:#1e1b2e; color:#fff; border-radius:12px; padding:12px; text-align:center; }
+    .kpi-row strong { display:block; font-size:1.2rem; color:#a78bfa; }
   </style>
 </head>
 <body class="admin-pro">
@@ -40,9 +51,10 @@
     <div class="adm-top-row">
       <div class="adm-brand">
         <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
-        <div><strong>Mensagens</strong><small>Chat com clientes</small></div>
+        <div><strong>Mensagens</strong><small id="hdrCount">Chat</small></div>
       </div>
       <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="notificacoes.html" title="Notificações">🔔<span class="adm-notif-badge" id="ntfBadge" style="display:none">0</span></a>
         <a class="adm-icon-btn" href="index.html">🏠</a>
       </div>
     </div>
@@ -67,21 +79,29 @@
     </div>
   </div>
   <div class="adm-shell">
-    <a class="adm-back" href="index.html">← Voltar</a>
+    <a class="adm-back" href="#" onclick="if(history.length>1){history.back()}else{location.href='index.html'};return false">← Voltar</a>
     <div class="adm-page-head">
       <div class="ico">💬</div>
       <div>
         <h1>Mensagens do site</h1>
-        <p>Clientes escrevem pelo chat da loja — responda aqui.</p>
+        <p>Ao responder, o cliente recebe notificação no chat da loja.</p>
       </div>
     </div>
+    <div class="kpi-row" id="kpis"></div>
     <div class="adm-actions-row">
       <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
+      <select class="adm-select" id="filtro" onchange="renderList()">
+        <option value="">Todas</option>
+        <option value="nova">Novas</option>
+        <option value="em_analise">Em análise</option>
+        <option value="respondida">Respondidas</option>
+        <option value="lida">Lidas</option>
+      </select>
     </div>
     <div class="msg-layout">
       <div class="msg-list" id="lista"></div>
       <div class="msg-detail" id="detail">
-        <p style="color:#64748b;margin:auto;text-align:center">Seleccione uma mensagem à esquerda</p>
+        <p style="color:#64748b;margin:auto;text-align:center">Seleccione uma mensagem</p>
       </div>
     </div>
   </div>
@@ -89,60 +109,112 @@
   <script src="/lodjastore/js/supabase-config.js"></script>
   <script src="/lodjastore/js/admin-auth.js"></script>
   <script src="/lodjastore/js/loja-storage.js"></script>
+  <script src="/lodjastore/js/admin-alerts.js"></script>
   <script>
     if (!AdminAuth.require()) throw 0;
     let msgs = [], selected = null;
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
-    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-    function fmt(iso){ try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return iso; } }
+    function esc(s){ return String(s==null||s===''?'—':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    function fmt(iso){ if(!iso) return '—'; try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return '—'; } }
+    function labelEstado(e) {
+      return ({ nova:'Nova', em_analise:'Em análise', respondida:'Respondida', lida:'Lida', nao_lida:'Não lida' })[e] || e || '—';
+    }
+    function tempoResposta(m) {
+      if (!m.respondido_em || !m.created_at) return '—';
+      const ms = new Date(m.respondido_em) - new Date(m.created_at);
+      if (ms < 0) return '—';
+      const min = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000);
+      if (min >= 60) return Math.floor(min/60) + 'h ' + (min%60) + 'm';
+      return min + 'm ' + sec + 's';
+    }
     function openMsg(id) {
       selected = msgs.find(m => m.id === id);
       if (!selected) return;
       document.querySelectorAll('.msg-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
-      if (selected.estado === 'nova') LojaDB.marcarMensagemLida(id).then(() => { selected.estado = 'lida'; renderList(); });
+      if (selected.estado === 'nova') {
+        LojaDB.actualizarEstadoMensagem(id, 'em_analise').then(() => {
+          selected.estado = 'em_analise';
+          renderList();
+        }).catch(()=>{});
+      }
       const d = document.getElementById('detail');
       d.innerHTML = `
         <div>
           <strong style="font-size:16px">${esc(selected.nome)}</strong>
-          <div style="font-size:13px;color:#64748b">${esc(selected.email||'')} ${selected.telefone?'· 📞 '+esc(selected.telefone):''}</div>
-          <div style="font-size:12px;color:#94a3b8;margin-top:4px">${fmt(selected.created_at)} · ${esc(selected.estado)}</div>
+          <div style="font-size:13px;color:#64748b">${esc(selected.email)} ${selected.telefone && selected.telefone!=='—' ? '· 📞 '+esc(selected.telefone) : ''}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:6px">
+            Enviada: ${fmt(selected.created_at)} ·
+            <span class="badge-st st-${esc(selected.estado)}">${labelEstado(selected.estado)}</span>
+          </div>
+          ${selected.respondido_em ? `<div style="font-size:12px;color:#94a3b8">Respondida: ${fmt(selected.respondido_em)} · Tempo: <strong>${tempoResposta(selected)}</strong></div>` : ''}
         </div>
         <div class="msg-thread">
-          <div class="bubble in">${esc(selected.mensagem)}</div>
-          ${selected.resposta ? `<div class="bubble out">${esc(selected.resposta)}<div style="font-size:11px;opacity:.8;margin-top:4px">${fmt(selected.respondido_em)}</div></div>` : ''}
+          <div class="bubble in">${esc(selected.mensagem)}<div style="font-size:11px;color:#94a3b8;margin-top:4px">${fmt(selected.created_at)}</div></div>
+          ${selected.resposta ? `<div class="bubble out">${esc(selected.resposta)}<div style="font-size:11px;opacity:.85;margin-top:4px">Loja · ${fmt(selected.respondido_em)}</div></div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="setEstado('em_analise')">Em análise</button>
+          <button type="button" class="adm-btn adm-btn-ghost adm-btn-sm" onclick="setEstado('lida')">Marcar lida</button>
         </div>
         <div class="msg-reply">
-          <textarea id="resp" placeholder="Escreva a resposta…">${selected.resposta && selected.estado==='respondida' ? '' : ''}</textarea>
-          <button type="button" class="adm-btn adm-btn-primary" onclick="sendReply()">Enviar</button>
+          <textarea id="resp" placeholder="Escreva a resposta ao cliente…">${selected.estado==='respondida' && selected.resposta ? '' : ''}</textarea>
+          <button type="button" class="adm-btn adm-btn-primary" onclick="sendReply()">Enviar resposta</button>
         </div>
         ${selected.telefone ? `<a class="adm-btn adm-btn-ghost" style="margin-top:8px" target="_blank" rel="noopener"
-          href="https://wa.me/${esc(selected.telefone)}?text=${encodeURIComponent('Olá '+selected.nome+', ')}">Abrir WhatsApp</a>` : ''}`;
+          href="https://wa.me/${String(selected.telefone).replace(/\D/g,'')}?text=${encodeURIComponent('Olá '+(selected.nome||'')+', ')}">Abrir WhatsApp</a>` : ''}`;
+    }
+    async function setEstado(st) {
+      if (!selected) return;
+      await LojaDB.actualizarEstadoMensagem(selected.id, st);
+      selected.estado = st;
+      await load();
+      openMsg(selected.id);
     }
     async function sendReply() {
       const t = document.getElementById('resp').value.trim();
       if (!t || !selected) return;
       try {
         await LojaDB.responderMensagem(selected.id, t);
-        alert('Resposta enviada.');
+        alert('Resposta enviada. O cliente verá a notificação no chat da loja.');
         await load();
         openMsg(selected.id);
       } catch (e) { alert(e.message || e); }
     }
     function renderList() {
-      document.getElementById('lista').innerHTML = msgs.map(m => `
+      const f = document.getElementById('filtro').value;
+      let list = msgs;
+      if (f) list = list.filter(m => m.estado === f);
+      // deep-link ?unread=1
+      const params = new URLSearchParams(location.search);
+      if (params.get('unread') === '1' && !f) list = msgs.filter(m => m.estado === 'nova');
+
+      document.getElementById('lista').innerHTML = list.map(m => `
         <div class="msg-item ${m.estado==='nova'?'nova':''} ${selected&&selected.id===m.id?'active':''}" data-id="${m.id}" onclick="openMsg('${m.id}')">
-          <div class="who">${esc(m.nome)} ${m.estado==='nova'?'<span style="color:#ef4444;font-size:11px">NOVA</span>':''}</div>
+          <div class="who">${esc(m.nome)} <span class="badge-st st-${esc(m.estado)}">${labelEstado(m.estado)}</span></div>
           <div class="preview">${esc(m.mensagem)}</div>
-          <div class="when">${fmt(m.created_at)} · ${esc(m.estado)}</div>
-        </div>`).join('') || '<p style="color:#64748b;padding:20px;text-align:center">Nenhuma mensagem ainda.</p>';
+          <div class="when">${fmt(m.created_at)}</div>
+        </div>`).join('') || '<p style="color:#64748b;padding:20px;text-align:center">Nenhuma mensagem.</p>';
+    }
+    function paintKpis() {
+      const novas = msgs.filter(m => m.estado === 'nova').length;
+      const resp = msgs.filter(m => m.estado === 'respondida').length;
+      const analise = msgs.filter(m => m.estado === 'em_analise').length;
+      document.getElementById('kpis').innerHTML = `
+        <div><strong>${msgs.length}</strong>Total</div>
+        <div><strong>${novas}</strong>Novas</div>
+        <div><strong>${analise}</strong>Em análise</div>
+        <div><strong>${resp}</strong>Respondidas</div>`;
+      document.getElementById('hdrCount').textContent = novas ? (novas + ' novas') : 'Chat com clientes';
     }
     async function load() {
       msgs = await LojaDB.getMensagensChat();
+      paintKpis();
       renderList();
       if (selected) {
         const still = msgs.find(m => m.id === selected.id);
-        if (still) openMsg(still.id);
+        if (still) { selected = still; openMsg(still.id); }
       }
+      if (window.AdminAlerts) AdminAlerts.refreshBadge();
     }
     (async () => {
       initSupabase();

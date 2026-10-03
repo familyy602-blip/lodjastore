@@ -157,6 +157,14 @@
         conta_id: sess && sess.id
       });
       document.getElementById('lc-texto').value = '';
+      try {
+        localStorage.setItem('lv_chat_email', isEmail ? contacto : '');
+        localStorage.setItem('lv_chat_tel', !isEmail ? contacto.replace(/\D/g,'') : '');
+        document.dispatchEvent(new CustomEvent('lodja-chat-sent', { detail: {
+          email: isEmail ? contacto : '',
+          telefone: !isEmail ? contacto.replace(/\D/g,'') : ''
+        }}));
+      } catch (e2) {}
       await refreshThread();
       alert('Mensagem enviada! Responderemos em breve.');
     } catch (err) {
@@ -166,4 +174,51 @@
       btnS.textContent = 'Enviar mensagem';
     }
   });
+
+
+  // Notificações de resposta do admin (polling)
+  async function pollClientNotifs() {
+    try {
+      if (typeof LojaDB === 'undefined') return;
+      await LojaDB.init();
+      const sess = LojaDB.getClienteSessao && LojaDB.getClienteSessao();
+      const email = (sess && sess.email) || localStorage.getItem('lv_chat_email') || '';
+      const tel = (sess && sess.telefone) || localStorage.getItem('lv_chat_tel') || '';
+      if (!email && !tel && !(sess && sess.id)) return;
+      const list = await LojaDB.getNotificacoesCliente({
+        email: email,
+        telefone: tel,
+        conta_id: sess && sess.id
+      });
+      const unread = list.filter(n => n.estado === 'enviada' || n.estado === 'pendente');
+      if (unread.length) {
+        btn.innerHTML = '💬<span style="position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:99px;display:grid;place-items:center">' + unread.length + '</span>';
+        btn.style.position = 'fixed';
+        // Browser notification if permitted
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const lastId = sessionStorage.getItem('lv_last_ntf');
+          const newest = unread[0];
+          if (newest && newest.id !== lastId) {
+            sessionStorage.setItem('lv_last_ntf', newest.id);
+            try { new Notification(newest.titulo || 'LODJA Store', { body: newest.corpo || 'Nova resposta' }); } catch (e) {}
+          }
+        } else if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
+    } catch (e) {}
+  }
+  setInterval(pollClientNotifs, 15000);
+  setTimeout(pollClientNotifs, 3000);
+
+  // Guardar contacto local para notifs
+  const _origSubmit = panel.querySelector('#lodja-chat-form');
+  // already has submit - patch storage of contact after send via Mutation - hook into existing
+  document.addEventListener('lodja-chat-sent', function (ev) {
+    try {
+      if (ev.detail && ev.detail.email) localStorage.setItem('lv_chat_email', ev.detail.email);
+      if (ev.detail && ev.detail.telefone) localStorage.setItem('lv_chat_tel', ev.detail.telefone);
+    } catch (e) {}
+  });
+
 })();

@@ -1073,7 +1073,10 @@ const LojaDB = {
     // Filtro de período
     let from = opts.from ? new Date(opts.from).getTime() : now - 30 * day;
     let to = opts.to ? new Date(opts.to).getTime() + day - 1 : now;
-    if (opts.periodDays) {
+    if (opts.allTime || opts.periodDays === 0) {
+      from = 0;
+      to = now;
+    } else if (opts.periodDays) {
       from = now - opts.periodDays * day;
       to = now;
     }
@@ -1250,10 +1253,21 @@ const LojaDB = {
   },
 
   async responderMensagem(id, resposta) {
+    const texto = (resposta || '').trim();
+    if (!texto) throw new Error('Escreva a resposta');
+    // carregar original
+    let orig = null;
+    if (!this._local && window.supabaseClient) {
+      const { data } = await window.supabaseClient.from('lv_mensagens').select('*').eq('id', id).maybeSingle();
+      orig = data;
+    } else {
+      orig = this._getLocal('lv_mensagens').find(m => m.id === id);
+    }
+    const agora = new Date().toISOString();
     const patch = {
-      resposta: (resposta || '').trim(),
+      resposta: texto,
       estado: 'respondida',
-      respondido_em: new Date().toISOString()
+      respondido_em: agora
     };
     if (!this._local && window.supabaseClient) {
       const { error } = await window.supabaseClient.from('lv_mensagens').update(patch).eq('id', id);
@@ -1264,7 +1278,156 @@ const LojaDB = {
       if (i >= 0) list[i] = { ...list[i], ...patch };
       this._setLocal('lv_mensagens', list);
     }
+    // Notificação para o cliente
+    if (orig) {
+      await this.criarNotificacaoCliente({
+        conta_id: orig.conta_id || null,
+        email: orig.email || null,
+        telefone: orig.telefone || null,
+        mensagem_id: id,
+        titulo: 'Nova resposta da loja',
+        corpo: texto.slice(0, 120),
+        tipo: 'chat_resposta'
+      });
+    }
   },
+
+  async actualizarEstadoMensagem(id, estado) {
+    const allowed = ['nova', 'em_analise', 'respondida', 'lida', 'nao_lida'];
+    if (!allowed.includes(estado)) throw new Error('Estado inválido');
+    if (!this._local && window.supabaseClient) {
+      await window.supabaseClient.from('lv_mensagens').update({ estado }).eq('id', id);
+    } else {
+      const list = this._getLocal('lv_mensagens');
+      const i = list.findIndex(m => m.id === id);
+      if (i >= 0) list[i].estado = estado;
+      this._setLocal('lv_mensagens', list);
+    }
+  },
+
+  /** Notificações destinadas ao cliente (respostas do chat, etc.) */
+  async criarNotificacaoCliente({ conta_id, email, telefone, mensagem_id, titulo, corpo, tipo }) {
+    const settings = await this.getSettings();
+    const delayMin = Number(settings.chatNotifDelayMin) || 0; // 0 = imediato
+    const agora = Date.now();
+    const enviarEm = new Date(agora + delayMin * 60 * 1000).toISOString();
+    const row = {
+      id: this.genId('cntf_'),
+      conta_id: conta_id || null,
+      email: (email || '').toLowerCase() || null,
+      telefone: (telefone || '').replace(/\D/g, '') || null,
+      mensagem_id: mensagem_id || null,
+      titulo: titulo || 'Notificação',
+      corpo: corpo || '',
+      tipo: tipo || 'info',
+      estado: delayMin > 0 ? 'agendada' : 'pendente',
+      created_at: new Date(agora).toISOString(),
+      enviar_em: enviarEm,
+      enviada_em: delayMin > 0 ? null : new Date(agora).toISOString(),
+      lida_em: null
+    };
+    if (delayMin === 0) row.estado = 'enviada';
+    if (!this._local && window.supabaseClient) {
+      try {
+        await window.supabaseClient.from('lv_notificacoes_cliente').insert(row);
+      } catch (e) {
+        const list = this._getLocal('lv_notificacoes_cliente');
+        list.unshift(row);
+        this._setLocal('lv_notificacoes_cliente', list.slice(0, 300));
+      }
+    } else {
+      const list = this._getLocal('lv_notificacoes_cliente');
+      list.unshift(row);
+      this._setLocal('lv_notificacoes_cliente', list.slice(0, 300));
+    }
+    return row;
+  },
+
+  async getNotificacoesCliente({ email, telefone, conta_id } = {}) {
+    let list = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data } = await window.supabaseClient
+          .from('lv_notificacoes_cliente')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+        list = data || [];
+      } catch (e) {
+        list = this._getLocal('lv_notificacoes_cliente');
+      }
+    } else list = this._getLocal('lv_notificacoes_cliente');
+
+    const em = (email || '').toLowerCase();
+    const tel = (telefone || '').replace(/\D/g, '');
+    const now = Date.now();
+    // libertar agendadas cujo tempo passou
+    list = list.map(n => {
+      if (n.estado === 'agendada' && n.enviar_em && new Date(n.enviar_em).getTime() <= now) {
+        return { ...n, estado: 'enviada', enviada_em: n.enviada_em || new Date().toISOString() };
+      }
+      return n;
+    });
+    return list.filter(n => {
+      if (conta_id && n.conta_id === conta_id) return true;
+      if (em && n.email === em) return true;
+      if (tel && n.telefone === tel) return true;
+      return false;
+    }).filter(n => n.estado === 'enviada' || n.estado === 'lida' || n.estado === 'pendente');
+  },
+
+  async marcarNotificacaoClienteLida(id) {
+    const patch = { estado: 'lida', lida_em: new Date().toISOString() };
+    if (!this._local && window.supabaseClient) {
+      try { await window.supabaseClient.from('lv_notificacoes_cliente').update(patch).eq('id', id); } catch (e) {}
+    }
+    const list = this._getLocal('lv_notificacoes_cliente');
+    const i = list.findIndex(n => n.id === id);
+    if (i >= 0) { list[i] = { ...list[i], ...patch }; this._setLocal('lv_notificacoes_cliente', list); }
+  },
+
+  async getEstatisticasGerais(opts = {}) {
+    const v = await this.getEstatisticasVisitas(opts);
+    const msgs = await this.getMensagensChat();
+    const contas = await this.getContasClientes();
+    const day = 86400000;
+    const now = Date.now();
+    let from = opts.from ? new Date(opts.from).getTime() : (opts.periodDays ? now - opts.periodDays * day : 0);
+    let to = opts.to ? new Date(opts.to).getTime() + day : now;
+    if (opts.periodDays === 0 || opts.allTime) { from = 0; to = now; }
+
+    const inPeriod = (iso) => {
+      if (!iso) return false;
+      const t = new Date(iso).getTime();
+      return t >= from && t <= to;
+    };
+    const msgsP = msgs.filter(m => inPeriod(m.created_at));
+    const contasP = contas.filter(c => inPeriod(c.data_criacao));
+    const respondidas = msgsP.filter(m => m.estado === 'respondida' && m.respondido_em);
+    let tempoResp = 0;
+    respondidas.forEach(m => {
+      tempoResp += new Date(m.respondido_em) - new Date(m.created_at);
+    });
+    const avgRespMs = respondidas.length ? tempoResp / respondidas.length : 0;
+    const avgMin = Math.floor(avgRespMs / 60000);
+    const avgSec = Math.floor((avgRespMs % 60000) / 1000);
+
+    return {
+      ...v,
+      clientesRegistados: contas.length,
+      novosClientes: contasP.length,
+      mensagensRecebidas: msgsP.length,
+      mensagensRespondidas: respondidas.length,
+      mensagensNovas: msgs.filter(m => m.estado === 'nova').length,
+      tempoMedioResposta: respondidas.length ? (String(avgMin).padStart(2,'0') + ':' + String(avgSec).padStart(2,'0')) : '—',
+      porPaisPct: (v.porPais || []).map(([pais, n]) => ({
+        pais: pais || 'Desconhecido',
+        visitantes: n,
+        pct: v.totalVisitas ? Math.round((n / v.totalVisitas) * 1000) / 10 : 0
+      }))
+    };
+  },
+
 
   async marcarMensagemLida(id) {
     if (!this._local && window.supabaseClient) {

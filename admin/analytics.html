@@ -95,7 +95,7 @@
     </div>
   </div>
   <div class="adm-shell">
-    <a class="adm-back" href="index.html">← Voltar</a>
+    <a class="adm-back" href="#" onclick="if(history.length>1){history.back()}else{location.href='index.html'};return false">← Voltar</a>
     <div class="adm-actions-row" style="margin-bottom:12px">
       <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
       <a class="adm-btn adm-btn-ghost" href="clientes.html">👥 Clientes</a>
@@ -110,6 +110,7 @@
           <button type="button" data-d="7">Últimos 7 dias</button>
           <button type="button" class="active" data-d="30">Últimos 30 dias</button>
           <button type="button" data-d="90">Últimos 90 dias</button>
+          <button type="button" data-d="0">Todo o período</button>
         </div>
       </div>
       <div class="ia-kpis" id="kpis"></div>
@@ -248,7 +249,21 @@
         x => x[1],
         x => x[0]
       );
-      document.getElementById('topPais').innerHTML = bars((rawV.porPais || []).slice(0, 10));
+      {
+        const paises = rawV.porPais || [];
+        const total = rawV.totalVisitas || 1;
+        document.getElementById('topPais').innerHTML = paises.length ? `
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;font-size:13px;font-weight:700;color:#64748b;margin-bottom:8px">
+            <span>País</span><span>Visitas</span><span>%</span>
+          </div>
+          ${paises.slice(0,12).map(([pais,n]) => `
+            <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;align-items:center">
+              <span>🌍 ${esc(pais||'Desconhecido')}</span>
+              <strong>${n}</strong>
+              <span style="color:#7c3aed;font-weight:800">${Math.round(n/total*1000)/10}%</span>
+            </div>`).join('')}
+        ` : '<p style="color:#64748b;font-size:13px">Sem dados de país ainda. Os próximos acessos registarão a localização.</p>';
+      }
       document.getElementById('topClientes').innerHTML = rowsList(
         rawV.topClientes || [],
         x => x.nome || x.email || x.conta_id || 'Cliente',
@@ -269,7 +284,7 @@
       }
     }
     async function load() {
-      rawV = await LojaDB.getEstatisticasVisitas({ periodDays });
+      rawV = await LojaDB.getEstatisticasVisitas(periodDays === 0 ? { allTime: true } : { periodDays });
       rawC = await LojaDB.getEstatisticasCarrinho();
       try {
         const contas = await LojaDB.getContasClientes();
