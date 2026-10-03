@@ -984,9 +984,16 @@ const LojaDB = {
     const device = (typeof Cart !== 'undefined' && Cart.deviceId) ? Cart.deviceId() :
       (localStorage.getItem('lv_device_id') || ('dev_' + Date.now().toString(36)));
     if (!localStorage.getItem('lv_device_id')) localStorage.setItem('lv_device_id', device);
+    let conta_id = null, conta_email = null;
+    try {
+      const sess = this.getClienteSessao();
+      if (sess) { conta_id = sess.id || null; conta_email = sess.email || null; }
+    } catch (e) {}
     const row = {
       id: this.genId('vis_'),
       device_id: device,
+      conta_id: conta_id,
+      conta_email: conta_email,
       pagina: pagina || (location.pathname || '/'),
       referrer: (document.referrer || '').slice(0, 300),
       user_agent: (navigator.userAgent || '').slice(0, 200),
@@ -1111,10 +1118,80 @@ const LojaDB = {
     }
     if (!row || row.pass_hash !== pass_hash) throw new Error('Email ou palavra-passe incorrectos');
     if (row.estado === 'inactivo') throw new Error('Conta desactivada');
+    const acessos = (Number(row.acessos) || 0) + 1;
+    const ultimo = new Date().toISOString();
+    if (!this._local && window.supabaseClient) {
+      try {
+        await window.supabaseClient.from('lv_contas_clientes').update({
+          acessos: acessos,
+          ultimo_acesso: ultimo
+        }).eq('id', row.id);
+      } catch (e) {}
+    } else {
+      const list = this._getLocal('lv_contas_clientes');
+      const i = list.findIndex(c => c.id === row.id);
+      if (i >= 0) { list[i].acessos = acessos; list[i].ultimo_acesso = ultimo; this._setLocal('lv_contas_clientes', list); }
+    }
     const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone };
     sessionStorage.setItem('lv_cliente_sessao', JSON.stringify(sess));
     return sess;
   },
+
+  async getContasClientes() {
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('lv_contas_clientes')
+          .select('*')
+          .order('data_criacao', { ascending: false });
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        console.warn('getContasClientes', e);
+      }
+    }
+    return this._getLocal('lv_contas_clientes');
+  },
+
+  async getEstatisticasContaCliente(conta) {
+    if (!conta) return null;
+    const id = conta.id || conta;
+    const email = (conta.email || '').toLowerCase();
+    // visitas desta conta
+    let visitas = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        let q = window.supabaseClient.from('lv_visitas').select('*').order('created_at', { ascending: false }).limit(500);
+        if (id) {
+          const { data } = await q.eq('conta_id', id);
+          visitas = data || [];
+        }
+        if (!visitas.length && email) {
+          const { data } = await window.supabaseClient.from('lv_visitas').select('*').eq('conta_email', email).order('created_at', { ascending: false }).limit(500);
+          visitas = data || [];
+        }
+      } catch (e) {
+        visitas = this._getLocal('lv_visitas').filter(v => v.conta_id === id || (email && v.conta_email === email));
+      }
+    } else {
+      visitas = this._getLocal('lv_visitas').filter(v => v.conta_id === id || (email && v.conta_email === email));
+    }
+    const desempenho = await this.getDesempenhoCliente(id, email);
+    const now = Date.now();
+    const day = 86400000;
+    return {
+      acessosLogin: Number(conta.acessos) || 0,
+      ultimoAcesso: conta.ultimo_acesso || null,
+      visitasPaginas: visitas.length,
+      visitasHoje: visitas.filter(v => now - new Date(v.created_at).getTime() < day).length,
+      visitasSemana: visitas.filter(v => now - new Date(v.created_at).getTime() < 7 * day).length,
+      paginas: Object.entries(visitas.reduce((a, v) => { a[v.pagina] = (a[v.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1]).slice(0, 10),
+      numPedidos: desempenho.numPedidos,
+      totalGasto: desempenho.totalGasto,
+      pedidos: desempenho.pedidos || []
+    };
+  },
+
 
   getClienteSessao() {
     try { return JSON.parse(sessionStorage.getItem('lv_cliente_sessao') || 'null'); } catch (e) { return null; }

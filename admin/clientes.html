@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Clientes registados — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
+  <link rel="icon" href="/lodjastore/logo-lodja.png">
+  <style>
+    .stat-mini { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin: 10px 0; }
+    @media(min-width:600px){ .stat-mini { grid-template-columns: repeat(4,1fr); } }
+    .stat-mini div { background:#f8fafc; border-radius:12px; padding:10px; text-align:center; }
+    .stat-mini strong { display:block; font-size:1.2rem; color:#4f46e5; }
+    .detail-box { display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+    .detail-box.open { display:block; }
+  </style>
+</head>
+<body class="admin-pro">
+  <header class="adm-top">
+    <div class="adm-top-row">
+      <div class="adm-brand">
+        <button type="button" class="adm-icon-btn" onclick="toggleMenu()">☰</button>
+        <div><strong>Clientes</strong><small>Contas registadas no site</small></div>
+      </div>
+      <div class="adm-top-actions">
+        <a class="adm-icon-btn" href="analytics.html" title="Visitantes">👁</a>
+        <a class="adm-icon-btn" href="index.html">🏠</a>
+      </div>
+    </div>
+  </header>
+  <div class="adm-drawer" id="drawer">
+    <div class="scrim" onclick="toggleMenu()"></div>
+    <div class="panel">
+      <a href="index.html">📊 Dashboard</a>
+      <a href="analytics.html">👁 Visitantes</a>
+      <a href="clientes.html" class="active">👥 Clientes registados</a>
+      <a href="produtos.html">👕 Produtos</a>
+      <a href="categorias.html">📂 Categorias</a>
+      <a href="fornecedores.html">🏭 Fornecedores</a>
+      <a href="pedidos.html">📦 Pedidos</a>
+      <a href="relatorios.html">📈 Relatórios</a>
+      <a href="notificacoes.html">🔔 Notificações</a>
+      <a href="promocoes.html">🏷️ Promoções</a>
+      <a href="configuracoes.html">⚙️ Configurações</a>
+      <a href="/lodjastore/index.html">🏠 Ver loja</a>
+      <a href="#" onclick="if(confirm('Sair?'))AdminAuth.logout();return false">🚪 Sair</a>
+    </div>
+  </div>
+  <div class="adm-shell">
+    <a class="adm-back" href="index.html">← Voltar</a>
+    <div class="adm-page-head">
+      <div class="ico">👥</div>
+      <div>
+        <h1>Clientes registados</h1>
+        <p>Contas criadas no site (email). Veja acessos e desempenho de cada um.</p>
+      </div>
+    </div>
+    <div class="adm-actions-row">
+      <button type="button" class="adm-btn adm-btn-primary" onclick="load()">🔄 Actualizar</button>
+      <a class="adm-btn adm-btn-ghost" href="analytics.html">👁 Estatísticas gerais</a>
+    </div>
+    <div class="adm-toolbar">
+      <div class="adm-search"><span>🔍</span><input id="q" placeholder="Nome, email ou telefone…" oninput="render()"></div>
+    </div>
+    <div id="resumo" class="stat-mini"></div>
+    <div id="lista"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/lodjastore/js/supabase-config.js"></script>
+  <script src="/lodjastore/js/admin-auth.js"></script>
+  <script src="/lodjastore/js/loja-storage.js"></script>
+  <script>
+    if (!AdminAuth.require()) throw 0;
+    let todos = [];
+    function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+    function fmtDate(iso){
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString('pt-PT'); } catch(e){ return iso; }
+    }
+    async function abrirDetalhe(id) {
+      const box = document.getElementById('det_'+id);
+      if (!box) return;
+      if (box.classList.contains('open')) { box.classList.remove('open'); return; }
+      document.querySelectorAll('.detail-box.open').forEach(el => el.classList.remove('open'));
+      box.classList.add('open');
+      box.innerHTML = '<p style="color:#64748b">A carregar estatísticas…</p>';
+      const c = todos.find(x => x.id === id);
+      try {
+        const st = await LojaDB.getEstatisticasContaCliente(c);
+        box.innerHTML = `
+          <div class="stat-mini">
+            <div><strong>${st.acessosLogin}</strong>Logins</div>
+            <div><strong>${st.visitasPaginas}</strong>Visitas a páginas</div>
+            <div><strong>${st.visitasHoje}</strong>Visitas hoje</div>
+            <div><strong>${st.visitasSemana}</strong>Visitas (7 dias)</div>
+            <div><strong>${st.numPedidos}</strong>Pedidos</div>
+            <div><strong>${LojaDB.formatMT(st.totalGasto)}</strong>Total gasto</div>
+          </div>
+          <p style="font-size:13px;color:#64748b">Último acesso: ${fmtDate(st.ultimoAcesso || c.ultimo_acesso)}</p>
+          <h4 style="margin:10px 0 6px">Páginas mais vistas</h4>
+          ${(st.paginas||[]).map(([p,n]) => `<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #f1f5f9">${esc(p)} · <strong>${n}</strong></div>`).join('') || '<p style="color:#64748b;font-size:13px">Sem visitas registadas com sessão.</p>'}
+          <h4 style="margin:12px 0 6px">Pedidos recentes</h4>
+          ${(st.pedidos||[]).slice(0,5).map(p => `<div style="font-size:13px;padding:4px 0">${esc(p.numero_pedido||p.id)} · ${LojaDB.formatMT(p.total)} · ${esc(p.estado)}</div>`).join('') || '<p style="color:#64748b;font-size:13px">Sem pedidos.</p>'}
+        `;
+      } catch (e) {
+        box.innerHTML = '<p style="color:#b91c1c">Erro: '+(e.message||e)+'</p>';
+      }
+    }
+    function render() {
+      const q = (document.getElementById('q').value||'').toLowerCase().trim();
+      let list = todos;
+      if (q) list = list.filter(c =>
+        (c.nome||'').toLowerCase().includes(q) ||
+        (c.email||'').toLowerCase().includes(q) ||
+        (c.telefone||'').includes(q)
+      );
+      const totalAcessos = todos.reduce((s,c)=>s+(Number(c.acessos)||0),0);
+      document.getElementById('resumo').innerHTML = `
+        <div><strong>${todos.length}</strong>Contas</div>
+        <div><strong>${totalAcessos}</strong>Logins no total</div>
+        <div><strong>${list.length}</strong>Na lista filtrada</div>
+        <div><strong>${todos.filter(c=>c.estado!=='inactivo').length}</strong>Activas</div>`;
+      document.getElementById('lista').innerHTML = list.map(c => `
+        <article class="adm-card">
+          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+            <div>
+              <strong style="font-size:16px">${esc(c.nome||'Sem nome')}</strong>
+              <div class="meta">${esc(c.email)}</div>
+              <div class="meta">${c.telefone ? '📞 '+esc(c.telefone) : ''} · Registo: ${fmtDate(c.data_criacao)}</div>
+              <div class="meta">Logins: <strong>${Number(c.acessos)||0}</strong> · Último: ${fmtDate(c.ultimo_acesso)}</div>
+            </div>
+            <button type="button" class="adm-btn adm-btn-primary adm-btn-sm" onclick="abrirDetalhe('${c.id}')">Ver estatísticas</button>
+          </div>
+          <div class="detail-box" id="det_${c.id}"></div>
+        </article>
+      `).join('') || '<p style="text-align:center;color:#64748b;padding:28px">Nenhum cliente registado ainda. Os clientes criam conta em Conta no site.</p>';
+    }
+    async function load() {
+      todos = await LojaDB.getContasClientes();
+      render();
+    }
+    (async () => {
+      initSupabase();
+      await LojaDB.init();
+      await load();
+    })();
+  </script>
+</body>
+</html>
