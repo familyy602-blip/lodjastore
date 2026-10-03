@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+  <script>
+    /* Branding síncrono ANTES do paint — evita flash LODJA */
+    (function(){
+      try {
+        var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+        window.__LV_BRAND = {
+          name: (s.siteName && s.siteName !== 'undefined') ? s.siteName : '',
+          logo: (s.logoUrl && s.logoUrl !== 'undefined') ? s.logoUrl : ''
+        };
+      } catch (e) { window.__LV_BRAND = { name: '', logo: '' }; }
+    })();
+  </script>
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>A minha conta</title>
@@ -95,7 +108,25 @@
     <div class="container header-inner">
       <a class="logo" href="index.html">
         <img src="/lodjastore/logo-lodja.png" alt="" width="40" height="40" style="border-radius:50%;object-fit:cover" id="brandLogo" class="brand-logo">
-        <span id="brandName">LODJA Store</span>
+        <span id="brandName"></span>
+        <script>
+          (function(){
+            var b = window.__LV_BRAND || {};
+            var n = document.getElementById('brandName');
+            if (n && b.name) n.textContent = b.name;
+            var i = document.getElementById('brandLogo');
+            if (i && b.logo) { i.onerror = function(){}; i.src = b.logo; }
+          })();
+        </script>
+        <script>
+          (function(){
+            var b = window.__LV_BRAND || {};
+            var n = document.getElementById('brandName');
+            if (n && b.name) n.textContent = b.name;
+            var i = document.getElementById('brandLogo');
+            if (i && b.logo) { i.onerror = function(){}; i.src = b.logo; }
+          })();
+        </script>
       </a>
       <nav class="nav-links">
         <a href="index.html">Início</a>

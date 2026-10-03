@@ -937,7 +937,7 @@ const LojaDB = {
   // ----- SETTINGS / PROMOÇÕES / UPLOAD -----
   defaultSettings() {
     return {
-      siteName: 'LODJA Store',
+      siteName: (typeof localStorage !== 'undefined' && (function(){try{var s=JSON.parse(localStorage.getItem('lv_settings')||'{}');return s.siteName||'';}catch(e){return '';}})()) || '',
       labelDesconhecido: 'Não identificado',
       labelSemNome: 'Cliente',
       chatWelcome: '',
@@ -995,7 +995,8 @@ const LojaDB = {
 
   applyBranding(settings) {
     if (!settings) return;
-    const name = settings.siteName || 'LODJA Store';
+    const name = settings.siteName || (window.__LV_BRAND && window.__LV_BRAND.name) || '';
+    if (!name && !settings.logoUrl) return;
     const logo = this.resolveLogoUrl(settings.logoUrl);
     document.querySelectorAll('#brandName, #footerName').forEach(el => { if (el) el.textContent = name; });
     document.querySelectorAll('#brandLogo').forEach(el => {
