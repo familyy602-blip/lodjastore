@@ -467,6 +467,56 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     } catch(e){}
   })();
   </script>
+
+    <script>
+      (function(){
+        try {
+          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
+          if (!logo) return;
+          function setFav(href) {
+            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+            if (!links.length) {
+              var l = document.createElement('link');
+              l.rel = 'icon';
+              document.head.appendChild(l);
+              links = [l];
+            }
+            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
+          }
+          setFav(logo);
+        } catch(e) {}
+      })();
+    </script>
+
+  <script>
+  (function(){
+    try {
+      var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+      var name = s.siteName || '';
+      var logo = s.logoUrl || '';
+      function go(){
+        document.querySelectorAll('.drawer-brand span, .adm-brand-name').forEach(function(el){
+          if (el.tagName === 'IMG') return;
+          if (name) el.textContent = name + (el.textContent.indexOf('Admin')>=0 || el.closest('.drawer-brand') ? ' · Admin' : '');
+        });
+        // simplify: set drawer brand text
+        var db = document.querySelector('.drawer-brand');
+        if (db && name) {
+          var spans = db.querySelectorAll('span');
+          spans.forEach(function(sp){ if (sp.querySelector('img')) return; sp.textContent = name; });
+        }
+        if (logo) {
+          document.querySelectorAll('.drawer-brand img, #adminBrandLogo, .adm-brand-logo').forEach(function(img){
+            img.onerror=function(){}; img.src=logo;
+          });
+          document.querySelectorAll('link[rel="icon"]').forEach(function(l){ l.href=logo; });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', go); else go();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body style="min-height:100vh;background:linear-gradient(160deg,#eef2ff,#f8fafc)">
   <div style="padding:16px">
@@ -475,9 +525,9 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <div style="display:grid;place-items:center;padding:24px">
     <form class="summary" style="width:min(380px,92vw)" id="form">
       <div style="text-align:center;margin-bottom:16px">
-        <img src="/lodjastore/logo-lodja.png" alt="" width="64" height="64" style="border-radius:50%;margin:0 auto 10px;display:block" onerror="this.style.display='none'">
+        <img id="adminBrandLogo" src="/lodjastore/logo-lodja.png" alt="" width="64" height="64" style="border-radius:50%;margin:0 auto 10px;display:block;object-fit:cover" onerror="this.onerror=null">
         <h1 style="font-size:1.25rem;margin:0">Painel administrativo</h1>
-        <p style="color:var(--muted);font-size:14px;margin-top:4px" id="siteLabel">LODJA Store</p>
+        <p style="color:var(--muted);font-size:14px;margin-top:4px" id="siteLabel"><img id="adminBrandLogo" src="/lodjastore/logo-lodja.png" width="56" height="56" style="border-radius:50%;object-fit:cover" alt=""> Store</p>
       </div>
       <div class="form-group">
         <label>Palavra-passe</label>
@@ -514,5 +564,29 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
       else alert('Palavra-passe incorrecta');
     };
   </script>
+<script>
+(function(){
+  try {
+    var s = JSON.parse(localStorage.getItem('lv_settings')||'{}');
+    if (s.logoUrl) {
+      var img = document.getElementById('adminBrandLogo');
+      if (img) { img.onerror=function(){}; img.src=s.logoUrl; }
+      document.querySelectorAll('link[rel="icon"]').forEach(function(l){ l.href=s.logoUrl; });
+    }
+    if (s.siteName) {
+      var sub = document.querySelector('h1 + p, .login-sub, #loginSiteName');
+      // add site name under title if missing
+      var h1 = document.querySelector('h1');
+      if (h1 && !document.getElementById('loginSiteName')) {
+        var p = document.createElement('p');
+        p.id = 'loginSiteName';
+        p.style.cssText = 'margin:4px 0 16px;color:#64748b;font-weight:600';
+        p.textContent = s.siteName;
+        h1.insertAdjacentElement('afterend', p);
+      }
+    }
+  } catch(e){}
+})();
+</script>
 </body>
 </html>

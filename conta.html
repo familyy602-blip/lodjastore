@@ -16,7 +16,7 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>A minha conta</title>
+  <title>Minha conta</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
@@ -102,8 +102,29 @@
       .auth-tabs button { font-size: 12px !important; padding: 10px 4px !important; }
     }
   </style>
+
+    <script>
+      (function(){
+        try {
+          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
+          if (!logo) return;
+          function setFav(href) {
+            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+            if (!links.length) {
+              var l = document.createElement('link');
+              l.rel = 'icon';
+              document.head.appendChild(l);
+              links = [l];
+            }
+            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
+          }
+          setFav(logo);
+        } catch(e) {}
+      })();
+    </script>
 </head>
-<body>
+<body class="subpage">
   <header class="site-header">
     <div class="container header-inner">
       <a class="logo" href="index.html">
@@ -128,11 +149,8 @@
           })();
         </script>
       </a>
-      <nav class="nav-links">
-        <a href="index.html">Início</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="pedidos.html">Meus pedidos</a>
-        <a href="conta.html" class="active">Conta</a>
+      <nav class="nav-links nav-subpage">
+        <a href="index.html" class="btn-voltar-nav" onclick="if(history.length>1){history.back();return false;}">← Voltar</a>
       </nav>
     </div>
   </header>
@@ -228,7 +246,7 @@
     <a href="index.html"><span class="ico">🏠</span>Início</a>
     <a href="catalogo.html"><span class="ico">▦</span>Catálogo</a>
     <a href="carrinho.html"><span class="ico">🛒</span>Carrinho</a>
-    <a href="conta.html" class="active"><span class="ico">👤</span>Conta</a>
+    <a href="conta.html" class="active"><span class="ico">👤</span>Minha conta</a>
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

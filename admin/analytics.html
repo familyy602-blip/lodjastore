@@ -81,6 +81,27 @@
     } catch(e){}
   })();
   </script>
+
+    <script>
+      (function(){
+        try {
+          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
+          if (!logo) return;
+          function setFav(href) {
+            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+            if (!links.length) {
+              var l = document.createElement('link');
+              l.rel = 'icon';
+              document.head.appendChild(l);
+              links = [l];
+            }
+            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
+          }
+          setFav(logo);
+        } catch(e) {}
+      })();
+    </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">
@@ -180,6 +201,23 @@
     if (!AdminAuth.require()) throw 0;
     let chart = null, periodDays = 30, rawV = null, rawC = null;
     function toggleMenu(){ document.getElementById('drawer').classList.toggle('open'); }
+    
+    function flagForPais(pais) {
+      var p = String(pais || '').toLowerCase();
+      var map = {
+        'mozambique': '🇲🇿', 'moçambique': '🇲🇿', 'moz': '🇲🇿',
+        'south africa': '🇿🇦', 'áfrica do sul': '🇿🇦', 'south-africa': '🇿🇦',
+        'portugal': '🇵🇹', 'brazil': '🇧🇷', 'brasil': '🇧🇷',
+        'angola': '🇦🇴', 'united states': '🇺🇸', 'usa': '🇺🇸',
+        'united kingdom': '🇬🇧', 'france': '🇫🇷', 'germany': '🇩🇪',
+        'nigeria': '🇳🇬', 'kenya': '🇰🇪', 'tanzania': '🇹🇿',
+        'zimbabwe': '🇿🇼', 'malawi': '🇲🇼', 'zambia': '🇿🇲',
+        'india': '🇮🇳', 'china': '🇨🇳', 'spain': '🇪🇸', 'italy': '🇮🇹'
+      };
+      for (var k in map) { if (p.indexOf(k) >= 0) return map[k]; }
+      return '🌍';
+    }
+
     function esc(s){if(s==null||s===''||s==='undefined'||s==='null')return '—';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     function shortPage(p){
       if(!p) return '—';
@@ -218,13 +256,14 @@
     }
     function paint() {
       if (!rawV) return;
+      const n = (v, d) => (v == null || v === '' || v === 'undefined' || Number.isNaN(v)) ? d : v;
       document.getElementById('kpis').innerHTML = `
-        <div class="ia-kpi"><div class="n">${rawV.visitantesUnicos}</div><div class="l">Visitantes</div></div>
-        <div class="ia-kpi"><div class="n">${rawV.totalVisitas}</div><div class="l">Visualizações</div></div>
-        <div class="ia-kpi"><div class="n">${rawV.sessoes}</div><div class="l">Sessões</div></div>
-        <div class="ia-kpi"><div class="n">${rawV.avgSessionLabel}</div><div class="l">Duração média</div></div>
-        <div class="ia-kpi"><div class="n">${rawV.bounceRate}%</div><div class="l">Taxa de rejeição</div></div>
-        <div class="ia-kpi"><div class="n">${rawV.viewsPerSession}</div><div class="l">Views / sessão</div></div>`;
+        <div class="ia-kpi"><div class="n">${n(rawV.visitantesUnicos, 0)}</div><div class="l">Visitantes</div></div>
+        <div class="ia-kpi"><div class="n">${n(rawV.totalVisitas, 0)}</div><div class="l">Visualizações</div></div>
+        <div class="ia-kpi"><div class="n">${n(rawV.sessoes, 0)}</div><div class="l">Sessões</div></div>
+        <div class="ia-kpi"><div class="n">${n(rawV.avgSessionLabel, '00:00')}</div><div class="l">Duração média</div></div>
+        <div class="ia-kpi"><div class="n">${n(rawV.bounceRate, 0)}%</div><div class="l">Taxa de rejeição</div></div>
+        <div class="ia-kpi"><div class="n">${n(rawV.viewsPerSession, 0)}</div><div class="l">Views / sessão</div></div>`;
 
       const serie = rawV.serieDiaria || [];
       const ctx = document.getElementById('chartMain').getContext('2d');
@@ -299,7 +338,7 @@
           </div>
           ${paises.slice(0,12).map(([pais,n]) => `
             <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;align-items:center">
-              <span>🌍 ${esc(pais||'Desconhecido')}</span>
+              <span>${flagForPais(pais)} ${esc(pais||'Não identificado')}</span>
               <strong>${n}</strong>
               <span style="color:#7c3aed;font-weight:800">${Math.round(n/total*1000)/10}%</span>
             </div>`).join('')}

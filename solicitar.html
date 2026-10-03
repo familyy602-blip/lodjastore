@@ -461,8 +461,29 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     }catch(e){}})();
   </script>
   <link rel="icon" href="/lodjastore/logo-lodja.png">
+
+    <script>
+      (function(){
+        try {
+          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
+          if (!logo) return;
+          function setFav(href) {
+            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+            if (!links.length) {
+              var l = document.createElement('link');
+              l.rel = 'icon';
+              document.head.appendChild(l);
+              links = [l];
+            }
+            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
+          }
+          setFav(logo);
+        } catch(e) {}
+      })();
+    </script>
 </head>
-<body>
+<body class="subpage">
   <div class="page-voltar">
     <a class="btn-voltar" href="index.html">← Voltar</a>
   </div>
@@ -492,14 +513,8 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         </script>
         </span>
       </a>
-      <nav class="nav-links">
-        <a href="index.html">Início</a>
-        <a href="catalogo.html">Catálogo</a>
-        <a href="solicitar.html" class="active">Solicitar</a>
-        <a href="pedidos.html">Meus pedidos</a>
-        <a href="conta.html">Conta</a>
-        <a href="admin/login.html">Admin</a>
-        <a class="icon-btn" href="carrinho.html" title="Carrinho">🛒<span class="badge-count" data-cart-count style="display:none">0</span></a>
+      <nav class="nav-links nav-subpage">
+        <a href="index.html" class="btn-voltar-nav" onclick="if(history.length>1){history.back();return false;}">← Voltar</a>
       </nav>
       <div class="m-header-actions" style="display:none">
         <a class="m-search-btn" href="catalogo.html" title="Pesquisar">🔍</a>
@@ -509,12 +524,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   </header>
 
   <div class="container">
-    <nav class="mobile-top-tabs" aria-label="Secções">
-      <a href="index.html">🏠 Início</a>
-      <a href="catalogo.html">▦ Catálogo</a>
-      <a href="pedidos.html">📦 Meus pedidos</a>
-      <a href="admin/login.html">👤 Admin</a>
-    </nav>
+    <!-- mobile tabs hidden on subpage -->
   </div>
 
 
@@ -540,7 +550,20 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         <div class="form-group"><label>Quantidade</label><input class="form-control" type="number" id="qty" min="1" value="1"></div>
       </div>
       <div class="form-group"><label>Nome *</label><input class="form-control" id="nome" required></div>
-      <div class="form-group"><label>Telefone / WhatsApp *</label><input class="form-control" id="tel" required inputmode="tel"></div>
+      <div class="form-group"><label>Telefone / WhatsApp *</label>
+        <div style="display:flex;gap:8px">
+          <select id="dial" class="form-control" style="width:120px;flex-shrink:0">
+            <option value="258">🇲🇿 +258</option>
+            <option value="27">🇿🇦 +27</option>
+            <option value="351">🇵🇹 +351</option>
+            <option value="55">🇧🇷 +55</option>
+            <option value="244">🇦🇴 +244</option>
+            <option value="1">🇺🇸 +1</option>
+            <option value="44">🇬🇧 +44</option>
+          </select>
+          <input class="form-control" id="tel" required inputmode="tel" placeholder="Número" style="flex:1">
+        </div>
+      </div>
       <div class="form-group"><label>Observações</label><textarea class="form-control" id="obs" rows="2"></textarea></div>
       <p id="precoHint" style="font-size:13px;color:var(--muted)"></p>
       <button class="btn btn-primary btn-block" type="button" id="btn">📲 Solicitar agora</button>
@@ -604,7 +627,9 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     document.getElementById('btn').onclick = async () => {
       if (!prodActual) return alert('Seleccione um produto');
       const nome = document.getElementById('nome').value.trim();
-      const tel = document.getElementById('tel').value.trim();
+      const dial = (document.getElementById('dial')||{}).value || '258';
+      let tel = document.getElementById('tel').value.replace(/\D/g,'');
+      if (tel && tel.indexOf(dial) !== 0) tel = dial + tel;
       if (!nome || !tel) return alert('Nome e telefone obrigatórios');
       const qty = Math.max(1, parseInt(document.getElementById('qty').value,10)||1);
       const tamanho = document.getElementById('tamGroup').style.display!=='none' ? document.getElementById('tamSelect').value : '';
@@ -654,7 +679,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
     <a href="index.html" data-bn="inicio"><span class="ico">🏠</span>Início</a>
     <a href="catalogo.html" data-bn="catalogo"><span class="ico">▦</span>Catálogo</a>
     <a href="carrinho.html" data-bn="carrinho"><span class="ico">🛒</span>Carrinho<span class="bn-badge" data-cart-count style="display:none">0</span></a>
-    <a href="admin/login.html" data-bn="conta"><span class="ico">👤</span>Conta</a>
+    <a href="conta.html" data-bn="conta"><span class="ico">👤</span>Minha conta</a>
   </nav>
   <script>
     (function(){

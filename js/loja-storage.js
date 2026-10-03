@@ -999,6 +999,14 @@ const LojaDB = {
     if (!name && !settings.logoUrl) return;
     const logo = this.resolveLogoUrl(settings.logoUrl);
     document.querySelectorAll('#brandName, #footerName').forEach(el => { if (el) el.textContent = name; });
+    if (logo) {
+      try {
+        document.querySelectorAll('link[rel="icon"],link[rel="shortcut icon"]').forEach(function(l){ l.href = logo; });
+        if (!document.querySelector('link[rel="icon"]')) {
+          var lf = document.createElement('link'); lf.rel = 'icon'; lf.href = logo; document.head.appendChild(lf);
+        }
+      } catch (e) {}
+    }
     document.querySelectorAll('#brandLogo').forEach(el => {
       if (!el) return;
       el.style.display = '';
@@ -1253,17 +1261,17 @@ const LojaDB = {
     const porReferrer = Object.entries(byRef).sort((a, b) => b[1] - a[1]).slice(0, 12);
 
     return {
-      totalVisitas: filtered.length,
-      visitasHoje: today.length,
-      visitasSemana: week.length,
-      visitantesUnicos: uniq(filtered),
-      unicosHoje: uniq(today),
-      unicosSemana: uniq(week),
-      sessoes: sessions.length,
-      bounceRate,
-      avgSessionLabel: String(avgMin).padStart(2, '0') + ':' + String(avgSec).padStart(2, '0'),
-      avgSessionMs: avgDurMs,
-      viewsPerSession: Math.round(viewsPerSession * 100) / 100,
+      totalVisitas: filtered.length || 0,
+      visitasHoje: today.length || 0,
+      visitasSemana: week.length || 0,
+      visitantesUnicos: uniq(filtered) || 0,
+      unicosHoje: uniq(today) || 0,
+      unicosSemana: uniq(week) || 0,
+      sessoes: (sessions && sessions.length) || 0,
+      bounceRate: bounceRate != null ? bounceRate : 0,
+      avgSessionLabel: String(avgMin || 0).padStart(2, '0') + ':' + String(avgSec || 0).padStart(2, '0'),
+      avgSessionMs: avgDurMs || 0,
+      viewsPerSession: Math.round((viewsPerSession || 0) * 100) / 100,
       porPagina: Object.entries(filtered.reduce((a, r) => { a[r.pagina] = (a[r.pagina] || 0) + 1; return a; }, {})).sort((a,b)=>b[1]-a[1]),
       serieDiaria,
       topClientes,

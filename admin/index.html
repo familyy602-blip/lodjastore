@@ -29,6 +29,56 @@
     } catch(e){}
   })();
   </script>
+
+    <script>
+      (function(){
+        try {
+          var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+          var logo = s.logoUrl || (window.__LV_BRAND && window.__LV_BRAND.logo) || '';
+          if (!logo) return;
+          function setFav(href) {
+            var links = document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"]');
+            if (!links.length) {
+              var l = document.createElement('link');
+              l.rel = 'icon';
+              document.head.appendChild(l);
+              links = [l];
+            }
+            links.forEach(function(l){ l.type = 'image/png'; l.href = href; });
+          }
+          setFav(logo);
+        } catch(e) {}
+      })();
+    </script>
+
+  <script>
+  (function(){
+    try {
+      var s = JSON.parse(localStorage.getItem('lv_settings') || '{}');
+      var name = s.siteName || '';
+      var logo = s.logoUrl || '';
+      function go(){
+        document.querySelectorAll('.drawer-brand span, .adm-brand-name').forEach(function(el){
+          if (el.tagName === 'IMG') return;
+          if (name) el.textContent = name + (el.textContent.indexOf('Admin')>=0 || el.closest('.drawer-brand') ? ' · Admin' : '');
+        });
+        // simplify: set drawer brand text
+        var db = document.querySelector('.drawer-brand');
+        if (db && name) {
+          var spans = db.querySelectorAll('span');
+          spans.forEach(function(sp){ if (sp.querySelector('img')) return; sp.textContent = name; });
+        }
+        if (logo) {
+          document.querySelectorAll('.drawer-brand img, #adminBrandLogo, .adm-brand-logo').forEach(function(img){
+            img.onerror=function(){}; img.src=logo;
+          });
+          document.querySelectorAll('link[rel="icon"]').forEach(function(l){ l.href=logo; });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', go); else go();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">
@@ -54,7 +104,7 @@
     <div class="panel">
       <div style="font-weight:800;padding:8px 12px 16px;display:flex;gap:10px;align-items:center">
         <img src="/lodjastore/logo-lodja.png" width="36" height="36" style="border-radius:50%" onerror="this.style.display='none'">
-        LODJA Admin
+        Admin
       </div>
       <a href="index.html" class="active">📊 Dashboard</a>
       <a href="analytics.html">👁 Visitantes</a>
