@@ -1,0 +1,9 @@
+
+ALTER TABLE lv_visitas ADD COLUMN IF NOT EXISTS pais TEXT;
+ALTER TABLE lv_visitas ADD COLUMN IF NOT EXISTS cidade TEXT;
+ALTER TABLE lv_visitas ADD COLUMN IF NOT EXISTS regiao TEXT;
+ALTER TABLE lv_visitas ADD COLUMN IF NOT EXISTS ip_publico TEXT;
+
+ALTER TABLE lv_contas_clientes ADD COLUMN IF NOT EXISTS ultimo_pais TEXT;
+ALTER TABLE lv_contas_clientes ADD COLUMN IF NOT EXISTS ultima_cidade TEXT;
+ALTER TABLE lv_contas_clientes ADD COLUMN IF NOT EXISTS ultimo_ip TEXT;

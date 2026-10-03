@@ -90,8 +90,17 @@
     </div>
 
     <div class="card">
-      <div class="adm-toolbar">
+      <div class="adm-toolbar" style="flex-wrap:wrap;gap:8px">
         <div class="adm-search"><span>🔍</span><input id="q" placeholder="Nome, email ou telefone…" oninput="renderList()"></div>
+        <select id="filtroCli" class="adm-select" onchange="renderList()">
+          <option value="todos">Todos</option>
+          <option value="novos">Novos (7 dias)</option>
+          <option value="mes">Novos este mês</option>
+          <option value="antigos">Antigos (&gt; 30 dias)</option>
+          <option value="activos">Com actividade / logins</option>
+          <option value="sem_acesso">Nunca acederam</option>
+          <option value="com_msg">Com mensagens</option>
+        </select>
       </div>
       <div id="lista"></div>
     </div>
@@ -193,7 +202,21 @@
     }
     function renderList() {
       const q = (document.getElementById('q').value||'').toLowerCase().trim();
+      const f = (document.getElementById('filtroCli')||{}).value || 'todos';
       let list = todos.slice();
+      const now = Date.now();
+      const day = 86400000;
+      if (f === 'novos') list = list.filter(c => c.data_criacao && now - new Date(c.data_criacao).getTime() <= 7*day);
+      else if (f === 'mes') {
+        const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+        list = list.filter(c => c.data_criacao && new Date(c.data_criacao).getTime() >= start);
+      }
+      else if (f === 'antigos') list = list.filter(c => !c.data_criacao || now - new Date(c.data_criacao).getTime() > 30*day);
+      else if (f === 'activos') list = list.filter(c => (Number(c.acessos)||0) > 0 || c.ultimo_acesso);
+      else if (f === 'sem_acesso') list = list.filter(c => !(Number(c.acessos)||0) && !c.ultimo_acesso);
+      else if (f === 'com_msg') list = list.filter(c => msgs.some(m =>
+        (c.email && m.email === c.email) || (c.telefone && m.telefone === String(c.telefone).replace(/\D/g,''))
+      ));
       if (q) list = list.filter(c =>
         (c.nome||'').toLowerCase().includes(q) ||
         (c.email||'').toLowerCase().includes(q) ||
@@ -207,6 +230,7 @@
               <div class="meta">${esc(c.email)}</div>
               <div class="meta">${c.telefone ? '📞 '+esc(c.telefone) : '—'} · Registo: ${fmtDate(c.data_criacao)}</div>
               <div class="meta">Logins: <strong>${Number(c.acessos)||0}</strong> · Último: ${fmtDate(c.ultimo_acesso)}</div>
+              <div class="meta">🌍 ${esc(c.ultimo_pais || 'Não identificado')}${c.ultima_cidade ? ' · '+esc(c.ultima_cidade) : ''}</div>
             </div>
             <button type="button" class="adm-btn adm-btn-primary adm-btn-sm" onclick="abrirDetalhe('${c.id}')">Estatísticas</button>
           </div>

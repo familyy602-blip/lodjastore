@@ -914,6 +914,10 @@ const LojaDB = {
   defaultSettings() {
     return {
       siteName: 'LODJA Store',
+      labelDesconhecido: 'Não identificado',
+      labelSemNome: 'Cliente',
+      chatWelcome: '',
+      chatNotifDelayMin: 0,
       adminPassword: localStorage.getItem('lv_admin_pass') || 'admin123',
       logoUrl: 'logo-lodja.png',
       whatsapp: '258862095655',
@@ -980,6 +984,69 @@ const LojaDB = {
   },
 
   // ----- ANALYTICS / VISITAS -----
+  /**
+   * País/cidade/IP via IP público do dispositivo.
+   * O browser não expõe o IP — um serviço externo lê o IP do pedido HTTP.
+   */
+  async _detectGeoByIp() {
+    const cache = {
+      pais: localStorage.getItem('lv_geo_pais') || null,
+      cidade: localStorage.getItem('lv_geo_cidade') || null,
+      regiao: localStorage.getItem('lv_geo_regiao') || null,
+      ip: localStorage.getItem('lv_geo_ip') || null
+    };
+    const geoTs = Number(localStorage.getItem('lv_geo_ts') || 0);
+    if (cache.pais && Date.now() - geoTs < 86400000) return cache;
+
+    const tryFetch = async (url, mapFn) => {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 3000);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(to);
+        if (!res.ok) return null;
+        return mapFn(await res.json());
+      } catch (e) {
+        clearTimeout(to);
+        return null;
+      }
+    };
+
+    let g = await tryFetch('https://ipapi.co/json/', (j) => ({
+      pais: j.country_name || j.country || null,
+      cidade: j.city || null,
+      regiao: j.region || j.region_code || null,
+      ip: j.ip || null
+    }));
+    if (!g || !g.pais) {
+      g = await tryFetch('https://get.geojs.io/v1/ip/geo.json', (j) => ({
+        pais: j.country || null,
+        cidade: j.city || null,
+        regiao: j.region || null,
+        ip: j.ip || null
+      }));
+    }
+    if (!g || !g.pais) {
+      g = await tryFetch('https://ipwho.is/', (j) => ({
+        pais: j.success === false ? null : (j.country || null),
+        cidade: j.city || null,
+        regiao: j.region || null,
+        ip: j.ip || null
+      }));
+    }
+    if (g && g.pais) {
+      try {
+        localStorage.setItem('lv_geo_pais', g.pais);
+        if (g.cidade) localStorage.setItem('lv_geo_cidade', g.cidade);
+        if (g.regiao) localStorage.setItem('lv_geo_regiao', g.regiao);
+        if (g.ip) localStorage.setItem('lv_geo_ip', g.ip);
+        localStorage.setItem('lv_geo_ts', String(Date.now()));
+      } catch (e) {}
+      return g;
+    }
+    return cache.pais ? cache : { pais: null, cidade: null, regiao: null, ip: null };
+  },
+
   async registrarVisita(pagina) {
     const device = (typeof Cart !== 'undefined' && Cart.deviceId) ? Cart.deviceId() :
       (localStorage.getItem('lv_device_id') || ('dev_' + Date.now().toString(36)));
@@ -990,27 +1057,7 @@ const LojaDB = {
       if (sess) { conta_id = sess.id || null; conta_email = sess.email || null; }
     } catch (e) {}
 
-    // País (1x por sessão de browser — cache 24h)
-    let pais = localStorage.getItem('lv_geo_pais') || null;
-    let cidade = localStorage.getItem('lv_geo_cidade') || null;
-    const geoTs = Number(localStorage.getItem('lv_geo_ts') || 0);
-    if (!pais || Date.now() - geoTs > 86400000) {
-      try {
-        const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), 2500);
-        const res = await fetch('https://ipapi.co/json/', { signal: ctrl.signal });
-        clearTimeout(to);
-        if (res.ok) {
-          const g = await res.json();
-          pais = g.country_name || g.country || null;
-          cidade = g.city || null;
-          if (pais) localStorage.setItem('lv_geo_pais', pais);
-          if (cidade) localStorage.setItem('lv_geo_cidade', cidade);
-          localStorage.setItem('lv_geo_ts', String(Date.now()));
-        }
-      } catch (e) {}
-    }
-
+    const geo = await this._detectGeoByIp();
     const row = {
       id: this.genId('vis_'),
       device_id: device,
@@ -1019,8 +1066,10 @@ const LojaDB = {
       pagina: pagina || (location.pathname || '/'),
       referrer: (document.referrer || '').slice(0, 300),
       user_agent: (navigator.userAgent || '').slice(0, 200),
-      pais: pais,
-      cidade: cidade,
+      pais: geo.pais || null,
+      cidade: geo.cidade || null,
+      regiao: geo.regiao || null,
+      ip_publico: geo.ip || null,
       created_at: new Date().toISOString()
     };
     if (!this._local && window.supabaseClient) {
@@ -1152,7 +1201,7 @@ const LojaDB = {
     // Geografia
     const byPais = {};
     filtered.forEach(r => {
-      const p = r.pais || 'Desconhecido';
+      const p = r.pais || 'Não identificado';
       byPais[p] = (byPais[p] || 0) + 1;
     });
     const porPais = Object.entries(byPais).sort((a, b) => b[1] - a[1]);
@@ -1421,7 +1470,7 @@ const LojaDB = {
       mensagensNovas: msgs.filter(m => m.estado === 'nova').length,
       tempoMedioResposta: respondidas.length ? (String(avgMin).padStart(2,'0') + ':' + String(avgSec).padStart(2,'0')) : '—',
       porPaisPct: (v.porPais || []).map(([pais, n]) => ({
-        pais: pais || 'Desconhecido',
+        pais: pais || 'Não identificado',
         visitantes: n,
         pct: v.totalVisitas ? Math.round((n / v.totalVisitas) * 1000) / 10 : 0
       }))
@@ -1606,19 +1655,25 @@ const LojaDB = {
     if (row.estado === 'inactivo') throw new Error('Conta desactivada');
     const acessos = (Number(row.acessos) || 0) + 1;
     const ultimo = new Date().toISOString();
+    let geo = { pais: null, cidade: null, ip: null };
+    try { geo = await this._detectGeoByIp(); } catch (e) {}
+    const patch = {
+      acessos: acessos,
+      ultimo_acesso: ultimo,
+      ultimo_pais: geo.pais || row.ultimo_pais || null,
+      ultima_cidade: geo.cidade || row.ultima_cidade || null,
+      ultimo_ip: geo.ip || null
+    };
     if (!this._local && window.supabaseClient) {
       try {
-        await window.supabaseClient.from('lv_contas_clientes').update({
-          acessos: acessos,
-          ultimo_acesso: ultimo
-        }).eq('id', row.id);
+        await window.supabaseClient.from('lv_contas_clientes').update(patch).eq('id', row.id);
       } catch (e) {}
     } else {
       const list = this._getLocal('lv_contas_clientes');
       const i = list.findIndex(c => c.id === row.id);
-      if (i >= 0) { list[i].acessos = acessos; list[i].ultimo_acesso = ultimo; this._setLocal('lv_contas_clientes', list); }
+      if (i >= 0) { list[i] = { ...list[i], ...patch }; this._setLocal('lv_contas_clientes', list); }
     }
-    const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone };
+    const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone, pais: geo.pais || null };
     sessionStorage.setItem('lv_cliente_sessao', JSON.stringify(sess));
     return sess;
   },
