@@ -1,8 +1,5 @@
 /**
- * Chat LODJA — fluxo conversacional (estilo Betway)
- * 1) Boas-vindas automáticas
- * 2) Pede nome → contacto → em que pode ajudar
- * 3) Depois só thread de mensagens (sem formulário)
+ * Chat LODJA — fluxo conversacional + bot inteligente
  */
 (function () {
   if (window.__lodjaChat) return;
@@ -34,25 +31,16 @@
   #lodja-chat-panel header strong{ font-size:15px; display:block; }
   #lodja-chat-panel header small{ font-size:11px; opacity:.9; }
   #lodja-chat-panel header button{ background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1; }
-  #lodja-chat-body{
-    flex:1;overflow-y:auto;padding:12px;background:#ece5dd;min-height:0;
-  }
-  .lc-bubble{
-    max-width:88%;padding:8px 12px;border-radius:10px;margin:6px 0;font-size:13px;line-height:1.4;
-    word-break:break-word;
-  }
+  #lodja-chat-body{ flex:1;overflow-y:auto;padding:12px;background:#ece5dd;min-height:0; }
+  .lc-bubble{ max-width:88%;padding:8px 12px;border-radius:10px;margin:6px 0;font-size:13px;line-height:1.4;word-break:break-word; }
   .lc-bubble.me{ background:#dcf8c6;margin-left:auto;border-bottom-right-radius:2px; }
   .lc-bubble.bot,.lc-bubble.admin{ background:#fff;margin-right:auto;border-bottom-left-radius:2px; }
   .lc-bubble .t{ font-size:10px;color:#667;margin-top:4px; }
-  #lodja-chat-composer{
-    padding:10px;background:#f0f2f5;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;
-  }
-  #lodja-chat-composer input{
-    flex:1;border:1px solid #ddd;border-radius:22px;padding:10px 14px;font:inherit;font-size:14px;
-  }
+  #lodja-chat-composer{ padding:10px;background:#f0f2f5;display:flex;gap:8px;align-items:center;flex-shrink:0; }
+  #lodja-chat-composer input{ flex:1;border:1px solid #ddd;border-radius:22px;padding:10px 14px;font:inherit;font-size:14px; }
   #lodja-chat-composer button{
-    background:#128c7e;color:#fff;border:none;border-radius:50%;width:42px;height:42px;
-    font-size:18px;cursor:pointer;flex-shrink:0;
+    background:#128c7e;color:#fff;border:none;border-radius:50%;width:44px;height:44px;
+    font-size:18px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;
   }
   #lodja-chat-composer button:disabled{ opacity:.5; }
   .lc-typing{ font-size:12px;color:#64748b;padding:4px 8px; }
@@ -67,38 +55,22 @@
   btn.type = 'button';
   btn.title = 'Fale connosco';
   btn.innerHTML = '💬';
-  btn.setAttribute('aria-label', 'Abrir chat');
 
   const panel = document.createElement('div');
   panel.id = 'lodja-chat-panel';
-  panel.innerHTML = `
-    <header>
-      <div>
-        <strong id="lc-title">Chat LODJA</strong>
-        <small id="lc-status">Online · Resposta da loja</small>
-      </div>
-      <button type="button" id="lodja-chat-close" aria-label="Fechar">×</button>
-    </header>
-    <div id="lodja-chat-body"></div>
-    <div id="lodja-chat-composer">
-      <input id="lc-input" type="text" placeholder="Escreva aqui…" autocomplete="off">
-      <button type="button" id="lc-send" aria-label="Enviar">➤</button>
-    </div>`;
+  panel.innerHTML =
+    '<header><div><strong id="lc-title">Chat LODJA</strong><small>Online · Atendimento</small></div>' +
+    '<button type="button" id="lodja-chat-close" aria-label="Fechar">×</button></header>' +
+    '<div id="lodja-chat-body"></div>' +
+    '<div id="lodja-chat-composer">' +
+    '<input id="lc-input" type="text" placeholder="Escreva aqui…" autocomplete="off">' +
+    '<button type="button" id="lc-send" aria-label="Enviar">➤</button></div>';
 
-  function mount() {
-    if (document.body.classList.contains('admin-pro')) return;
-    document.body.appendChild(btn);
-    document.body.appendChild(panel);
-    initStoreName();
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
-  else mount();
-
-  /** Estado da conversa */
-  let step = 'boot'; // boot | nome | contacto | ajuda | chat
+  let step = 'boot';
   let profile = loadProfile();
   let localThread = loadThread();
   let sending = false;
+  let bound = false;
 
   function loadProfile() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || {}; } catch (e) { return {}; }
@@ -112,7 +84,6 @@
   function saveThread() {
     try { localStorage.setItem(THREAD_KEY, JSON.stringify(localThread.slice(-80))); } catch (e) {}
   }
-
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -122,38 +93,25 @@
     } catch (e) { return ''; }
   }
 
-  async function initStoreName() {
-    try {
-      if (typeof LojaDB !== 'undefined') {
-        if (typeof initSupabase === 'function' && !window.supabaseClient) initSupabase();
-        await LojaDB.init();
-        const s = await LojaDB.getSettings();
-        const name = s.siteName || 'LODJA Store';
-        const el = document.getElementById('lc-title');
-        if (el) el.textContent = name;
-      }
-    } catch (e) {}
-  }
-
   function pushLocal(role, text) {
-    const msg = { role, text, at: new Date().toISOString() };
+    const msg = { role: role, text: text, at: new Date().toISOString() };
     localThread.push(msg);
     saveThread();
     return msg;
   }
 
   function renderBody() {
-    const body = document.getElementById('lodja-chat-body');
+    const body = panel.querySelector('#lodja-chat-body');
     if (!body) return;
-    body.innerHTML = localThread.map(m => {
+    body.innerHTML = localThread.map(function (m) {
       const cls = m.role === 'me' ? 'me' : (m.role === 'admin' ? 'admin' : 'bot');
-      return `<div class="lc-bubble ${cls}">${esc(m.text)}<div class="t">${fmt(m.at)}</div></div>`;
+      return '<div class="lc-bubble ' + cls + '">' + esc(m.text) + '<div class="t">' + fmt(m.at) + '</div></div>';
     }).join('');
     body.scrollTop = body.scrollHeight;
   }
 
   function setPlaceholder() {
-    const input = document.getElementById('lc-input');
+    const input = panel.querySelector('#lc-input');
     if (!input) return;
     if (step === 'nome') input.placeholder = 'O seu nome…';
     else if (step === 'contacto') input.placeholder = 'Email ou WhatsApp…';
@@ -161,84 +119,14 @@
     else input.placeholder = 'Escreva a sua mensagem…';
   }
 
-  async function startFlow() {
-    await initStoreName();
-    // Já tem perfil completo → só chat
-    if (profile.nome && profile.contacto) {
-      step = 'chat';
-      if (!localThread.length) {
-        pushLocal('bot', `Olá ${profile.nome}! 👋 Em que podemos ajudar hoje?`);
-      }
-      await mergeRemoteThread();
-      renderBody();
-      setPlaceholder();
-      return;
-    }
-    // Sessão de conta
-    try {
-      const sess = typeof LojaDB !== 'undefined' && LojaDB.getClienteSessao && LojaDB.getClienteSessao();
-      if (sess && (sess.nome || sess.email)) {
-        profile.nome = profile.nome || sess.nome;
-        profile.contacto = profile.contacto || sess.email || sess.telefone;
-        profile.conta_id = sess.id;
-        saveProfile();
-      }
-    } catch (e) {}
-
-    if (profile.nome && profile.contacto) {
-      step = 'chat';
-      if (!localThread.length) pushLocal('bot', `Olá ${profile.nome}! Em que podemos ajudar?`);
-      await mergeRemoteThread();
-      renderBody();
-      setPlaceholder();
-      return;
-    }
-
-    // Novo visitante — onboarding
-    if (!localThread.length) {
-      const store = (document.getElementById('lc-title') || {}).textContent || 'LODJA Store';
-      pushLocal('bot', `Olá! 👋 Bem-vindo ao atendimento da ${store}.`);
-      pushLocal('bot', 'Para o ajudar melhor, qual é o seu nome?');
-      step = 'nome';
-    } else {
-      // retomar step a partir do perfil parcial
-      if (!profile.nome) step = 'nome';
-      else if (!profile.contacto) step = 'contacto';
-      else step = 'ajuda';
-    }
-    renderBody();
-    setPlaceholder();
-  }
-
-  async function mergeRemoteThread() {
-    if (!profile.contacto || typeof LojaDB === 'undefined') return;
-    try {
-      await LojaDB.init();
-      const isEmail = String(profile.contacto).includes('@');
-      const email = isEmail ? profile.contacto : (profile.email || '');
-      const tel = !isEmail ? String(profile.contacto).replace(/\D/g, '') : (profile.telefone || '');
-      const list = await LojaDB.getMensagensCliente(email, tel);
-      list.forEach(m => {
-        const idKey = 'srv_' + m.id;
-        if (localThread.some(x => x.sid === idKey)) return;
-        localThread.push({ role: 'me', text: m.mensagem, at: m.created_at, sid: idKey });
-        if (m.resposta) {
-          localThread.push({ role: 'admin', text: m.resposta, at: m.respondido_em || m.created_at, sid: idKey + '_r' });
-        }
-      });
-      localThread.sort((a, b) => new Date(a.at) - new Date(b.at));
-      saveThread();
-    } catch (e) {}
-  }
-
   function botDelay(text, ms) {
-    return new Promise(resolve => {
-      const body = document.getElementById('lodja-chat-body');
+    return new Promise(function (resolve) {
+      const body = panel.querySelector('#lodja-chat-body');
       const tip = document.createElement('div');
       tip.className = 'lc-typing';
       tip.textContent = 'A escrever…';
       if (body) { body.appendChild(tip); body.scrollTop = body.scrollHeight; }
-      setTimeout(() => {
+      setTimeout(function () {
         if (tip.parentNode) tip.remove();
         pushLocal('bot', text);
         renderBody();
@@ -247,10 +135,111 @@
     });
   }
 
+  function smartReply(text) {
+    const low = String(text || '').toLowerCase();
+    if (/(ola|olá|bom dia|boa tarde|boa noite|hey|hi)\b/.test(low)) {
+      return 'Olá' + (profile.nome ? ', ' + profile.nome : '') + '! Posso ajudar com pedidos, produtos, entrega ou pagamento.';
+    }
+    if (/horario|horário|abre|fecha|funcionamento/.test(low)) {
+      return 'O site está disponível 24h. A equipa confirma pedidos em horário comercial.';
+    }
+    if (/preco|preço|preços|quanto custa|valor/.test(low)) {
+      return 'Os preços estão no catálogo de cada produto. Quer ajuda com um artigo específico?';
+    }
+    if (/pedido|encomenda|rastre|estado do pedido|meu pedido/.test(low)) {
+      return 'Em «Meus pedidos» pode pesquisar por telefone, email ou nome. Pode indicar aqui o nº do pedido.';
+    }
+    if (/entrega|envio|morada/.test(low)) {
+      return 'A entrega é combinada após confirmação do pedido por WhatsApp. Indique a zona e o que pretende.';
+    }
+    if (/pagar|pagamento|mpesa|emola|transferencia|transferência/.test(low)) {
+      return 'O pagamento é confirmado com a loja após o pedido (WhatsApp / mobile money).';
+    }
+    if (/obrigad|valeu|thanks/.test(low)) return 'Disponha! Se precisar de mais alguma coisa, estamos aqui.';
+    if (/whatsapp|contacto|contato|telefone da loja/.test(low)) {
+      return 'Pode continuar neste chat ou fazer o pedido no site (abre o WhatsApp da loja).';
+    }
+    if (/conta|login|palavra-passe|senha|password/.test(low)) {
+      return 'Na página Conta pode entrar, criar conta ou recuperar a palavra-passe com email ou telefone.';
+    }
+    return null;
+  }
+
+  async function initStoreName() {
+    try {
+      if (typeof LojaDB !== 'undefined') {
+        if (typeof initSupabase === 'function' && !window.supabaseClient) initSupabase();
+        await LojaDB.init();
+        const s = await LojaDB.getSettings();
+        const name = s.siteName || 'LODJA Store';
+        const el = panel.querySelector('#lc-title');
+        if (el) el.textContent = name;
+      }
+    } catch (e) {}
+  }
+
+  async function mergeRemoteThread() {
+    if (!profile.contacto || typeof LojaDB === 'undefined') return;
+    try {
+      await LojaDB.init();
+      const isEmail = String(profile.contacto).indexOf('@') >= 0;
+      const email = isEmail ? profile.contacto : (profile.email || '');
+      const tel = !isEmail ? String(profile.contacto).replace(/\D/g, '') : (profile.telefone || '');
+      const list = await LojaDB.getMensagensCliente(email, tel);
+      list.forEach(function (m) {
+        var idKey = 'srv_' + m.id;
+        if (localThread.some(function (x) { return x.sid === idKey; })) return;
+        localThread.push({ role: 'me', text: m.mensagem, at: m.created_at, sid: idKey });
+        if (m.resposta) {
+          localThread.push({ role: 'admin', text: m.resposta, at: m.respondido_em || m.created_at, sid: idKey + '_r' });
+        }
+      });
+      localThread.sort(function (a, b) { return new Date(a.at) - new Date(b.at); });
+      saveThread();
+    } catch (e) {}
+  }
+
+  async function startFlow() {
+    await initStoreName();
+    try {
+      var sess = typeof LojaDB !== 'undefined' && LojaDB.getClienteSessao && LojaDB.getClienteSessao();
+      if (sess) {
+        profile.nome = profile.nome || sess.nome;
+        profile.contacto = profile.contacto || sess.email || sess.telefone;
+        profile.email = profile.email || sess.email;
+        profile.telefone = profile.telefone || sess.telefone;
+        profile.conta_id = sess.id;
+        saveProfile();
+      }
+    } catch (e) {}
+
+    if (profile.nome && profile.contacto) {
+      step = 'chat';
+      if (!localThread.length) {
+        pushLocal('bot', 'Olá ' + profile.nome + '! 👋 Em que podemos ajudar hoje?');
+      }
+      await mergeRemoteThread();
+      renderBody();
+      setPlaceholder();
+      return;
+    }
+
+    if (!localThread.length) {
+      var store = (panel.querySelector('#lc-title') || {}).textContent || 'LODJA Store';
+      pushLocal('bot', 'Olá! 👋 Bem-vindo ao atendimento da ' + store + '.');
+      pushLocal('bot', 'Para o ajudar melhor, qual é o seu nome?');
+      step = 'nome';
+    } else if (!profile.nome) step = 'nome';
+    else if (!profile.contacto) step = 'contacto';
+    else step = 'ajuda';
+    renderBody();
+    setPlaceholder();
+  }
+
   async function handleUserText(raw) {
-    const text = String(raw || '').trim();
+    var text = String(raw || '').trim();
     if (!text || sending) return;
-    const input = document.getElementById('lc-input');
+    var input = panel.querySelector('#lc-input');
     if (input) input.value = '';
 
     pushLocal('me', text);
@@ -261,13 +250,13 @@
       saveProfile();
       step = 'contacto';
       setPlaceholder();
-      await botDelay(`Prazer, ${profile.nome}! Qual é o seu email ou número de WhatsApp?`, 700);
+      await botDelay('Prazer, ' + profile.nome + '! Qual é o seu email ou número de WhatsApp?', 700);
       return;
     }
 
     if (step === 'contacto') {
       profile.contacto = text.slice(0, 120);
-      if (text.includes('@')) profile.email = text.toLowerCase();
+      if (text.indexOf('@') >= 0) profile.email = text.toLowerCase();
       else profile.telefone = text.replace(/\D/g, '');
       saveProfile();
       try {
@@ -283,13 +272,15 @@
     if (step === 'ajuda' || step === 'chat') {
       step = 'chat';
       setPlaceholder();
-      // Gravar mensagem no backend
+      var auto = smartReply(text);
       sending = true;
+      var sendBtn = panel.querySelector('#lc-send');
+      if (sendBtn) sendBtn.disabled = true;
       try {
         if (typeof initSupabase === 'function' && !window.supabaseClient) initSupabase();
         if (typeof LojaDB !== 'undefined') {
           await LojaDB.init();
-          const isEmail = String(profile.contacto || '').includes('@');
+          var isEmail = String(profile.contacto || '').indexOf('@') >= 0;
           await LojaDB.enviarMensagemChat({
             nome: profile.nome || 'Cliente',
             email: isEmail ? profile.contacto : (profile.email || ''),
@@ -298,11 +289,15 @@
             conta_id: profile.conta_id || null
           });
         }
-        await botDelay('Mensagem recebida ✅ A equipa vai responder em breve. Pode continuar a escrever aqui.', 800);
+        if (auto) await botDelay(auto, 700);
+        else await botDelay('Mensagem recebida ✅ A equipa da loja vai responder em breve.', 800);
       } catch (err) {
-        await botDelay('Não foi possível enviar agora. Tente de novo ou contacte-nos pelo WhatsApp.', 600);
+        console.error(err);
+        if (auto) await botDelay(auto, 500);
+        await botDelay('Não foi possível gravar agora (rede). Tente de novo dentro de momentos.', 600);
       } finally {
         sending = false;
+        if (sendBtn) sendBtn.disabled = false;
       }
     }
   }
@@ -310,73 +305,79 @@
   function open() {
     panel.classList.add('open');
     startFlow();
+    setTimeout(function () {
+      var input = panel.querySelector('#lc-input');
+      if (input) input.focus();
+    }, 200);
   }
   function close() { panel.classList.remove('open'); }
 
-  btn.addEventListener('click', () => {
-    if (panel.classList.contains('open')) close();
-    else open();
-  });
-  panel.querySelector('#lodja-chat-close').addEventListener('click', close);
-
-  document.getElementById('lc-send').addEventListener('click', () => {
-    handleUserText(document.getElementById('lc-input').value);
-  });
-  document.getElementById('lc-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+  function bindEvents() {
+    if (bound) return;
+    bound = true;
+    btn.addEventListener('click', function () {
+      if (panel.classList.contains('open')) close();
+      else open();
+    });
+    panel.querySelector('#lodja-chat-close').addEventListener('click', close);
+    panel.querySelector('#lc-send').addEventListener('click', function (e) {
       e.preventDefault();
-      handleUserText(document.getElementById('lc-input').value);
-    }
-  });
+      e.stopPropagation();
+      var input = panel.querySelector('#lc-input');
+      handleUserText(input ? input.value : '');
+    });
+    panel.querySelector('#lc-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleUserText(e.target.value);
+      }
+    });
+  }
 
-  // Poll respostas do admin
-  async function pollClientNotifs() {
+  function mount() {
+    if (document.body && document.body.classList.contains('admin-pro')) return;
+    if (!document.body) return;
+    if (!btn.parentNode) document.body.appendChild(btn);
+    if (!panel.parentNode) document.body.appendChild(panel);
+    bindEvents();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+  setTimeout(mount, 50);
+  setTimeout(mount, 500);
+
+  // Poll respostas admin
+  setInterval(async function () {
     try {
       if (typeof LojaDB === 'undefined') return;
       await LojaDB.init();
-      const email = profile.email || localStorage.getItem('lv_chat_email') || '';
-      const tel = profile.telefone || localStorage.getItem('lv_chat_tel') || '';
+      var email = profile.email || localStorage.getItem('lv_chat_email') || '';
+      var tel = profile.telefone || localStorage.getItem('lv_chat_tel') || '';
       if (!email && !tel && !profile.contacto) return;
-
-      const isEmail = String(profile.contacto || email).includes('@');
-      const em = isEmail ? (profile.contacto || email) : email;
-      const te = !isEmail ? String(profile.contacto || tel).replace(/\D/g, '') : tel;
-
-      const list = await LojaDB.getMensagensCliente(em, te);
-      let added = false;
-      list.forEach(m => {
+      var isEmail = String(profile.contacto || email).indexOf('@') >= 0;
+      var em = isEmail ? (profile.contacto || email) : email;
+      var te = !isEmail ? String(profile.contacto || tel).replace(/\D/g, '') : tel;
+      var list = await LojaDB.getMensagensCliente(em, te);
+      var added = false;
+      list.forEach(function (m) {
         if (m.resposta) {
-          const sid = 'srv_' + m.id + '_r';
-          if (!localThread.some(x => x.sid === sid)) {
-            localThread.push({ role: 'admin', text: m.resposta, at: m.respondido_em || m.created_at, sid });
+          var sid = 'srv_' + m.id + '_r';
+          if (!localThread.some(function (x) { return x.sid === sid; })) {
+            localThread.push({ role: 'admin', text: m.resposta, at: m.respondido_em || m.created_at, sid: sid });
             added = true;
           }
         }
       });
       if (added) {
-        localThread.sort((a, b) => new Date(a.at) - new Date(b.at));
+        localThread.sort(function (a, b) { return new Date(a.at) - new Date(b.at); });
         saveThread();
         if (panel.classList.contains('open')) renderBody();
         btn.innerHTML = '💬<span style="position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:99px;display:grid;place-items:center">1</span>';
       }
-
-      const notifs = await LojaDB.getNotificacoesCliente({
-        email: em,
-        telefone: te,
-        conta_id: profile.conta_id
-      });
-      const unread = notifs.filter(n => n.estado === 'enviada' || n.estado === 'pendente');
-      if (unread.length && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        const lastId = sessionStorage.getItem('lv_last_ntf');
-        if (unread[0].id !== lastId) {
-          sessionStorage.setItem('lv_last_ntf', unread[0].id);
-          try { new Notification(unread[0].titulo || 'LODJA Store', { body: unread[0].corpo || '' }); } catch (e) {}
-        }
-      } else if (unread.length && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
     } catch (e) {}
-  }
-  setInterval(pollClientNotifs, 12000);
-  setTimeout(pollClientNotifs, 4000);
+  }, 12000);
 })();

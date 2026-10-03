@@ -435,6 +435,14 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
   <title>LODJA Store</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/lodjastore/css/loja.css">
+  <script>
+    (function(){try{var c=localStorage.getItem('lv_settings');if(!c)return;var s=JSON.parse(c);
+      document.addEventListener('DOMContentLoaded',function(){
+        if(s.siteName){var n=document.getElementById('brandName');if(n)n.textContent=s.siteName;}
+        if(s.logoUrl){var i=document.getElementById('brandLogo');if(i){i.onerror=function(){};i.src=s.logoUrl;}}
+      });
+    }catch(e){}})();
+    </script>
   <link rel="icon" href="/lodjastore/logo-lodja.png">
 </head>
 <body>

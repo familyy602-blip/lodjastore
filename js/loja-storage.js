@@ -830,15 +830,35 @@ const LojaDB = {
   },
 
   async getPedidos(filtros = {}) {
+    const normTel = (v) => String(v || '').replace(/\D/g, '');
+    const qtxt = (filtros.q || filtros.busca || '').trim().toLowerCase();
+    const matchPedido = (p) => {
+      if (filtros.telefone) {
+        if (normTel(p.cliente_telefone) !== normTel(filtros.telefone)) return false;
+      }
+      if (filtros.email) {
+        if (String(p.cliente_email || '').toLowerCase() !== String(filtros.email).toLowerCase().trim()) return false;
+      }
+      if (filtros.nome) {
+        if (!(String(p.cliente_nome || '').toLowerCase().includes(String(filtros.nome).toLowerCase().trim()))) return false;
+      }
+      if (qtxt) {
+        const blob = [p.cliente_nome, p.cliente_email, p.cliente_telefone, p.numero_pedido, p.id]
+          .map(x => String(x || '').toLowerCase()).join(' ');
+        const telQ = normTel(qtxt);
+        if (!blob.includes(qtxt) && !(telQ && normTel(p.cliente_telefone).includes(telQ))) return false;
+      }
+      return true;
+    };
     if (this._local) {
       let list = this._getLocal('lv_pedidos');
-      if (filtros.telefone) list = list.filter(p => String(p.cliente_telefone).replace(/\D/g, '') === String(filtros.telefone).replace(/\D/g, ''));
-      return list;
+      return list.filter(matchPedido);
     }
     let q = window.supabaseClient.from('lv_pedidos').select('*').order('data_criacao', { ascending: false });
-    if (filtros.telefone) q = q.eq('cliente_telefone', filtros.telefone);
+    // filtros exactos no servidor quando possível
+    if (filtros.telefone && !qtxt) q = q.eq('cliente_telefone', filtros.telefone);
     const { data } = await q;
-    let list = data || [];
+    let list = (data || []).filter(matchPedido);
     // Anexar itens (necessário para relatórios por categoria / top produtos)
     try {
       const ids = list.map(p => p.id).filter(Boolean);
@@ -1676,6 +1696,85 @@ const LojaDB = {
     const sess = { id: row.id, email: row.email, nome: row.nome, telefone: row.telefone, pais: geo.pais || null };
     sessionStorage.setItem('lv_cliente_sessao', JSON.stringify(sess));
     return sess;
+  },
+
+  async solicitarRecuperacao(contacto) {
+    const raw = String(contacto || '').trim();
+    if (!raw) throw new Error('Indique email ou telefone');
+    const isEmail = raw.includes('@');
+    const email = isEmail ? raw.toLowerCase() : null;
+    const telefone = !isEmail ? raw.replace(/\D/g, '') : null;
+    let row = null;
+    const contas = await this.getContasClientes();
+    if (isEmail) row = contas.find(c => (c.email || '').toLowerCase() === email);
+    else row = contas.find(c => String(c.telefone || '').replace(/\D/g, '') === telefone || String(c.telefone || '').replace(/\D/g, '').endsWith(telefone));
+    if (!row) throw new Error('Conta não encontrada com esses dados');
+    const codigo = String(Math.floor(100000 + Math.random() * 900000));
+    const rec = {
+      id: this.genId('rec_'),
+      conta_id: row.id,
+      email: row.email || email,
+      telefone: row.telefone || telefone,
+      codigo: codigo,
+      usado: false,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    };
+    if (!this._local && window.supabaseClient) {
+      try {
+        await window.supabaseClient.from('lv_recuperacao').insert(rec);
+      } catch (e) {
+        const list = this._getLocal('lv_recuperacao');
+        list.unshift(rec);
+        this._setLocal('lv_recuperacao', list.slice(0, 50));
+      }
+    } else {
+      const list = this._getLocal('lv_recuperacao');
+      list.unshift(rec);
+      this._setLocal('lv_recuperacao', list.slice(0, 50));
+    }
+    return { codigo, email: row.email, telefone: row.telefone, nome: row.nome, conta_id: row.id };
+  },
+
+  async redefinirPasswordComCodigo({ contacto, codigo, novaPassword }) {
+    const raw = String(contacto || '').trim();
+    const isEmail = raw.includes('@');
+    const email = isEmail ? raw.toLowerCase() : null;
+    const telefone = !isEmail ? raw.replace(/\D/g, '') : null;
+    let list = [];
+    if (!this._local && window.supabaseClient) {
+      try {
+        const { data } = await window.supabaseClient.from('lv_recuperacao').select('*').order('created_at', { ascending: false }).limit(30);
+        list = data || [];
+      } catch (e) {
+        list = this._getLocal('lv_recuperacao');
+      }
+    } else list = this._getLocal('lv_recuperacao');
+    const now = Date.now();
+    const rec = list.find(r =>
+      r.codigo === String(codigo).trim() &&
+      !r.usado &&
+      new Date(r.expires_at).getTime() > now &&
+      ((email && (r.email || '').toLowerCase() === email) || (telefone && String(r.telefone || '').replace(/\D/g, '') === telefone))
+    );
+    if (!rec) throw new Error('Código inválido ou expirado');
+    if (!novaPassword || String(novaPassword).length < 4) throw new Error('Nova palavra-passe demasiado curta');
+    const pass_hash = btoa(unescape(encodeURIComponent(novaPassword + '|lodja'))).slice(0, 64);
+    if (!this._local && window.supabaseClient) {
+      const { error } = await window.supabaseClient.from('lv_contas_clientes').update({ pass_hash }).eq('id', rec.conta_id);
+      if (error) throw error;
+      try {
+        await window.supabaseClient.from('lv_recuperacao').update({ usado: true }).eq('id', rec.id);
+      } catch (e) {}
+    } else {
+      const contas = this._getLocal('lv_contas_clientes');
+      const i = contas.findIndex(c => c.id === rec.conta_id);
+      if (i >= 0) { contas[i].pass_hash = pass_hash; this._setLocal('lv_contas_clientes', contas); }
+      const recs = this._getLocal('lv_recuperacao');
+      const j = recs.findIndex(r => r.id === rec.id);
+      if (j >= 0) { recs[j].usado = true; this._setLocal('lv_recuperacao', recs); }
+    }
+    return true;
   },
 
   async getContasClientes() {
