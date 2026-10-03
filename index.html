@@ -601,7 +601,7 @@ table.data th { background: #f8fafc; font-size: 12px; color: var(--muted); }
         const ms = Math.max(0, new Date(fimIso).getTime() - Date.now());
         if (ms <= 0) {
           document.getElementById('promoBanner').style.display = 'none';
-          document.getElementById('bonusDestaque').style.display = 'none';
+          window.__bonusActivo = false; document.getElementById('bonusDestaque').style.display = 'none';
           document.getElementById('btnBonus').style.display = 'none';
           return;
         }

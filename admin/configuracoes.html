@@ -10,6 +10,27 @@
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+  (function(){
+    try {
+      var c = localStorage.getItem('lv_settings');
+      if (!c) return;
+      var s = JSON.parse(c);
+      function apply(){
+        var name = s.siteName || 'Admin';
+        document.querySelectorAll('.adm-brand-name, .drawer-brand span:last-child').forEach(function(el){
+          if (el && el.tagName !== 'IMG') el.textContent = name + ' Admin';
+        });
+        if (s.logoUrl) {
+          document.querySelectorAll('.drawer-brand img, .adm-brand-logo').forEach(function(img){
+            img.onerror = function(){}; img.src = s.logoUrl;
+          });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">
@@ -61,6 +82,17 @@
         </div>
         <div class="form-group"><label>WhatsApp dos pedidos (com código do país)</label>
           <input class="form-control" id="whatsapp" placeholder="258862095655"></div>
+        <div class="form-group">
+          <label>CallMeBot API Key (códigos por WhatsApp)</label>
+          <input class="form-control" id="callmebotApiKey" placeholder="Cole aqui a API key do CallMeBot" autocomplete="off">
+          <p style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.45">
+            1) No WhatsApp, adicione o contacto <strong>+34 644 66 45 40</strong><br>
+            2) Envie a mensagem: <code>I allow callmebot to send me messages</code><br>
+            3) Recebe a <strong>apikey</strong> — cole neste campo e guarde.<br>
+            4) O número usado no registo deve ser o mesmo que activou o bot (com indicativo, ex. 25884…).
+            Guia: <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">callmebot.com</a>
+          </p>
+        </div>
         <div class="form-group"><label>Nova palavra-passe do admin</label>
           <input class="form-control" type="password" id="adminPassword" placeholder="Deixe em branco para não alterar" autocomplete="new-password"></div>
         <div class="form-group"><label><input type="checkbox" id="syncCompras"> Sincronizar compras concluídas com LODJA v1</label></div>
@@ -105,6 +137,7 @@
       const s = await LojaDB.getSettings();
       document.getElementById('siteName').value = s.siteName || 'LODJA Store';
       document.getElementById('whatsapp').value = s.whatsapp || '258862095655';
+      document.getElementById('callmebotApiKey').value = s.callmebotApiKey || '';
       document.getElementById('syncCompras').checked = s.syncComprasLodja !== false;
       document.getElementById('syncClientes').checked = s.syncClientesLodja !== false;
       document.getElementById('mostrarBonus').checked = s.mostrarBonusEspecial !== false;
@@ -119,6 +152,7 @@
       const patch = {
         siteName: document.getElementById('siteName').value.trim() || 'LODJA Store',
         whatsapp: document.getElementById('whatsapp').value.replace(/\D/g, ''),
+        callmebotApiKey: document.getElementById('callmebotApiKey').value.trim(),
         syncComprasLodja: document.getElementById('syncCompras').checked,
         syncClientesLodja: document.getElementById('syncClientes').checked,
         mostrarBonusEspecial: document.getElementById('mostrarBonus').checked,

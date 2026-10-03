@@ -33,6 +33,27 @@
     .stat-mini div { background:#f8fafc; border-radius:12px; padding:10px; text-align:center; }
     .stat-mini strong { display:block; font-size:1.15rem; color:#7c3aed; }
   </style>
+  <script>
+  (function(){
+    try {
+      var c = localStorage.getItem('lv_settings');
+      if (!c) return;
+      var s = JSON.parse(c);
+      function apply(){
+        var name = s.siteName || 'Admin';
+        document.querySelectorAll('.adm-brand-name, .drawer-brand span:last-child').forEach(function(el){
+          if (el && el.tagName !== 'IMG') el.textContent = name + ' Admin';
+        });
+        if (s.logoUrl) {
+          document.querySelectorAll('.drawer-brand img, .adm-brand-logo').forEach(function(img){
+            img.onerror = function(){}; img.src = s.logoUrl;
+          });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">

@@ -21,7 +21,7 @@
   </script>
   <style>
     .auth-card{max-width:440px;margin:24px auto;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:18px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.06)}
-    .auth-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+    .auth-tabs{display:flex!important;gap:8px;margin-bottom:16px;flex-wrap:wrap;visibility:visible!important;opacity:1!important}
     .auth-tabs button{flex:1;min-width:88px;padding:10px 8px;border-radius:12px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:700;cursor:pointer;font-size:13px}
     .auth-tabs button.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
     .perf-stat{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
@@ -34,7 +34,7 @@
     .phone-row input{flex:1}
     .code-row{display:flex;gap:8px;align-items:flex-end}
     .code-row input{flex:1}
-    .admin-link{display:block;margin-top:16px;padding:14px;border-radius:14px;background:#0f172a;color:#fff;text-align:center;font-weight:700;text-decoration:none}
+    .admin-link{display:block;margin-top:20px;padding:10px;border-radius:12px;background:transparent;color:#64748b;text-align:center;font-weight:600;text-decoration:none;border:1px dashed #cbd5e1;font-size:13px}
     .admin-link small{display:block;font-weight:500;opacity:.8;margin-top:4px;font-size:12px}
     .badge-ok{color:#059669;font-size:12px;font-weight:700}
   </style>
@@ -105,10 +105,24 @@
 
       <div id="paneRec" style="display:none">
         <h2 style="margin:0 0 8px">Recuperar conta</h2>
-        <p class="hint">Recebe um código no email ou WhatsApp (não é mostrado neste ecrã).</p>
+        <p class="hint">Escolha email ou WhatsApp. O código é enviado para o contacto — não aparece neste ecrã.</p>
         <div id="recStep1">
-          <div class="form-group"><label>Email ou telefone com indicativo</label>
-            <input class="form-control" id="recContact" placeholder="email@… ou 25884…">
+          <div class="form-group"><label>Método</label>
+            <select class="form-control" id="recMetodo" onchange="toggleRecMetodo()">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+          <div id="recBoxEmail" style="display:none" class="form-group">
+            <label>Email da conta</label>
+            <input class="form-control" id="recEmail" type="email" placeholder="email@exemplo.com">
+          </div>
+          <div id="recBoxWa" class="form-group">
+            <label>WhatsApp da conta</label>
+            <div class="phone-row">
+              <select id="recDial" aria-label="Indicativo"></select>
+              <input class="form-control" id="recTel" type="tel" placeholder="Número">
+            </div>
           </div>
           <button type="button" class="btn btn-primary" style="width:100%" onclick="doPedirCodigo()">Enviar código</button>
         </div>
@@ -120,7 +134,7 @@
         </div>
       </div>
 
-      <a class="admin-link" href="admin/login.html">🔐 Painel do Administrador<small>Acesso reservado · requer credenciais de admin</small></a>
+      <a class="admin-link" id="adminLinkAuth" href="admin/login.html">🔐 Painel do Administrador<small>Acesso reservado · requer credenciais de admin</small></a>
     </div>
 
     <div class="auth-card" id="boxDash" style="display:none">
@@ -140,7 +154,9 @@
         <a class="btn btn-outline" href="catalogo.html">Continuar a comprar</a>
         <button type="button" class="btn btn-outline" onclick="doLogout()">Sair da conta</button>
       </div>
-      <a class="admin-link" href="admin/login.html">🔐 Painel do Administrador<small>Se for administrador da loja</small></a>
+      <p style="margin-top:20px;text-align:center;font-size:12px;color:#94a3b8">
+        <a href="admin/login.html" style="color:#64748b">Área admin</a>
+      </p>
     </div>
   </main>
   <nav class="bottom-nav">
@@ -190,9 +206,24 @@
       {c:'AU',d:'61',n:'🇦🇺 Austrália'}
     ];
     function fillDials() {
-      var sel = document.getElementById('rDial');
-      sel.innerHTML = DIALS.map(function(x){ return '<option value="'+x.d+'">'+x.n+' (+'+x.d+')</option>'; }).join('');
-      sel.value = '258';
+      function fill(sel) {
+        if (!sel) return;
+        sel.innerHTML = DIALS.map(function(x){ return '<option value="'+x.d+'">'+x.n+' (+'+x.d+')</option>'; }).join('');
+        sel.value = '258';
+      }
+      fill(document.getElementById('rDial'));
+      fill(document.getElementById('recDial'));
+    }
+    function toggleRecMetodo() {
+      var m = document.getElementById('recMetodo').value;
+      document.getElementById('recBoxEmail').style.display = m==='email' ? '' : 'none';
+      document.getElementById('recBoxWa').style.display = m==='whatsapp' ? '' : 'none';
+    }
+    function fullRecPhone() {
+      var dial = document.getElementById('recDial').value;
+      var num = document.getElementById('recTel').value.replace(/\D/g,'');
+      if (num.indexOf(dial) === 0) return num;
+      return dial + num;
     }
     function fullPhone() {
       var dial = document.getElementById('rDial').value;
@@ -207,6 +238,8 @@
       document.getElementById('tabLogin').classList.toggle('active', t==='login');
       document.getElementById('tabReg').classList.toggle('active', t==='reg');
       document.getElementById('tabRec').classList.toggle('active', t==='rec');
+      var al = document.getElementById('adminLinkAuth');
+      if (al) al.style.display = t==='login' ? '' : 'none';
     }
     async function showDash(sess) {
       document.getElementById('boxAuth').style.display = 'none';
@@ -284,12 +317,16 @@
     }
     async function doPedirCodigo() {
       try {
-        var contacto = document.getElementById('recContact').value.trim();
+        var m = document.getElementById('recMetodo').value;
+        var contacto = m === 'email'
+          ? document.getElementById('recEmail').value.trim()
+          : fullRecPhone();
+        if (!contacto) throw new Error(m==='email' ? 'Indique o email' : 'Indique o número');
         var r = await LojaDB.solicitarRecuperacao(contacto);
         _recContacto = contacto;
         document.getElementById('recStep1').style.display = 'none';
         document.getElementById('recStep2').style.display = '';
-        document.getElementById('recHint').textContent = r.mensagem || 'Se a conta existir, o código foi enviado. Introduza-o abaixo.';
+        document.getElementById('recHint').textContent = r.mensagem || 'Código enviado. Verifique o WhatsApp/email e introduza-o abaixo.';
       } catch(e) { alert(e.message || e); }
     }
     async function doRedefinir() {

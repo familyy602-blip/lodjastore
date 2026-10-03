@@ -17,6 +17,27 @@
     .stat-grid-pro { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
     @media(min-width:700px){ .stat-grid-pro { grid-template-columns:repeat(4,1fr); } }
   </style>
+  <script>
+  (function(){
+    try {
+      var c = localStorage.getItem('lv_settings');
+      if (!c) return;
+      var s = JSON.parse(c);
+      function apply(){
+        var name = s.siteName || 'Admin';
+        document.querySelectorAll('.adm-brand-name, .drawer-brand span:last-child').forEach(function(el){
+          if (el && el.tagName !== 'IMG') el.textContent = name + ' Admin';
+        });
+        if (s.logoUrl) {
+          document.querySelectorAll('.drawer-brand img, .adm-brand-logo').forEach(function(img){
+            img.onerror = function(){}; img.src = s.logoUrl;
+          });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">

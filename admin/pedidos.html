@@ -9,6 +9,27 @@
   <link rel="stylesheet" href="/lodjastore/css/admin-ui.css">
   <link rel="icon" href="/lodjastore/logo-lodja.png">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+  (function(){
+    try {
+      var c = localStorage.getItem('lv_settings');
+      if (!c) return;
+      var s = JSON.parse(c);
+      function apply(){
+        var name = s.siteName || 'Admin';
+        document.querySelectorAll('.adm-brand-name, .drawer-brand span:last-child').forEach(function(el){
+          if (el && el.tagName !== 'IMG') el.textContent = name + ' Admin';
+        });
+        if (s.logoUrl) {
+          document.querySelectorAll('.drawer-brand img, .adm-brand-logo').forEach(function(img){
+            img.onerror = function(){}; img.src = s.logoUrl;
+          });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">

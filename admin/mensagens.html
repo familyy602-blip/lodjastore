@@ -45,6 +45,27 @@
     .kpi-row div { background:#1e1b2e; color:#fff; border-radius:12px; padding:12px; text-align:center; }
     .kpi-row strong { display:block; font-size:1.2rem; color:#a78bfa; }
   </style>
+  <script>
+  (function(){
+    try {
+      var c = localStorage.getItem('lv_settings');
+      if (!c) return;
+      var s = JSON.parse(c);
+      function apply(){
+        var name = s.siteName || 'Admin';
+        document.querySelectorAll('.adm-brand-name, .drawer-brand span:last-child').forEach(function(el){
+          if (el && el.tagName !== 'IMG') el.textContent = name + ' Admin';
+        });
+        if (s.logoUrl) {
+          document.querySelectorAll('.drawer-brand img, .adm-brand-logo').forEach(function(img){
+            img.onerror = function(){}; img.src = s.logoUrl;
+          });
+        }
+      }
+      if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+    } catch(e){}
+  })();
+  </script>
 </head>
 <body class="admin-pro">
   <header class="adm-top">

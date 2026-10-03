@@ -3,6 +3,10 @@
  * Supabase (lv_*) com fallback localStorage se tabelas ainda não existirem
  */
 const LojaDB = {
+  _cleanStr(v, fallback) {
+    if (v == null || v === '' || v === 'undefined' || v === 'null' || v === 'NaN') return fallback != null ? fallback : null;
+    return String(v);
+  },
   _local: true,
 
   async init() {
@@ -1086,9 +1090,9 @@ const LojaDB = {
       pagina: pagina || (location.pathname || '/'),
       referrer: (document.referrer || '').slice(0, 300),
       user_agent: (navigator.userAgent || '').slice(0, 200),
-      pais: geo.pais || null,
-      cidade: geo.cidade || null,
-      regiao: geo.regiao || null,
+      pais: this._cleanStr(geo.pais, null),
+      cidade: this._cleanStr(geo.cidade, null),
+      regiao: this._cleanStr(geo.regiao, null),
       ip_publico: geo.ip || null,
       created_at: new Date().toISOString()
     };
@@ -1221,10 +1225,20 @@ const LojaDB = {
     // Geografia
     const byPais = {};
     filtered.forEach(r => {
-      const p = r.pais || 'Não identificado';
+      const p = this._cleanStr(r.pais, 'Não identificado');
       byPais[p] = (byPais[p] || 0) + 1;
     });
     const porPais = Object.entries(byPais).sort((a, b) => b[1] - a[1]);
+
+    const byRegiao = {}, byCidade = {};
+    filtered.forEach(r => {
+      const rg = (r.regiao && r.regiao !== 'undefined') ? r.regiao : null;
+      const cd = (r.cidade && r.cidade !== 'undefined') ? r.cidade : null;
+      if (rg) byRegiao[rg] = (byRegiao[rg] || 0) + 1;
+      if (cd) byCidade[cd] = (byCidade[cd] || 0) + 1;
+    });
+    const porRegiao = Object.entries(byRegiao).sort((a, b) => b[1] - a[1]);
+    const porCidade = Object.entries(byCidade).sort((a, b) => b[1] - a[1]);
 
     // Referrers
     const byRef = {};
@@ -1254,6 +1268,8 @@ const LojaDB = {
       topClientes,
       topDevices,
       porPais,
+      porRegiao,
+      porCidade,
       porReferrer,
       periodFrom: new Date(from).toISOString(),
       periodTo: new Date(to).toISOString()
@@ -1702,14 +1718,36 @@ const LojaDB = {
         if (res.ok) enviado = true;
       } catch (e) { console.warn('email send', e); }
     } else {
-      // WhatsApp: webhook configurável nas settings (ex. CallMeBot / API própria)
+      // WhatsApp via CallMeBot (gratuito) ou webhook customizado
       try {
         const s = await this.getSettings();
-        const url = s.whatsappCodeWebhook || s.smsWebhook || '';
-        if (url) {
-          const u = url.replace('{phone}', row.destino).replace('{text}', encodeURIComponent(texto)).replace('{code}', codigo);
-          const res = await fetch(u, { method: s.whatsappWebhookMethod || 'GET' });
-          if (res.ok) enviado = true;
+        const phone = String(row.destino || '').replace(/\D/g, '');
+        const apiKey = (s.callmebotApiKey || s.whatsappApiKey || '').trim();
+        if (apiKey && phone) {
+          const sendCM = async (to, msg) => {
+            const u = 'https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent(to) +
+              '&text=' + encodeURIComponent(msg) +
+              '&apikey=' + encodeURIComponent(apiKey);
+            try {
+              const res = await fetch(u, { method: 'GET', mode: 'cors' });
+              if (res && res.ok) return true;
+            } catch (e) {}
+            try { await fetch(u, { method: 'GET', mode: 'no-cors' }); return true; } catch (e2) { return false; }
+          };
+          // 1) tentar enviar para o número do cliente
+          enviado = await sendCM(phone, texto);
+          // 2) também notificar o WhatsApp da loja (se diferente) — útil se a key for da loja
+          const storePhone = String(s.whatsapp || '').replace(/\D/g, '');
+          if (storePhone && storePhone !== phone) {
+            await sendCM(storePhone, 'LODJA código para +' + phone + ': ' + codigo + ' (15 min)');
+          }
+        } else if (s.whatsappCodeWebhook) {
+          const u = String(s.whatsappCodeWebhook)
+            .replace('{phone}', phone)
+            .replace('{text}', encodeURIComponent(texto))
+            .replace('{code}', codigo);
+          const res = await fetch(u, { method: s.whatsappWebhookMethod || 'GET', mode: 'no-cors' }).catch(() => null);
+          enviado = true;
         }
       } catch (e) { console.warn('wa send', e); }
     }
@@ -1717,12 +1755,11 @@ const LojaDB = {
     sessionStorage.setItem(rk, String(Date.now()));
     sessionStorage.setItem(rk + '_n', String(tentativas + 1));
 
-    // Nunca devolver o código ao cliente no browser
     return { ok: true, canal: canalN, enviado, destino: row.destino, mensagem: enviado
-      ? ('Código enviado por ' + (canalN === 'email' ? 'email' : 'WhatsApp') + '. Verifique e introduza abaixo.')
+      ? ('Código enviado por ' + (canalN === 'email' ? 'email' : 'WhatsApp') + '. Verifique o telemóvel e introduza o código abaixo.')
       : (canalN === 'email'
-        ? 'Não foi possível enviar o email automaticamente. Confirme o endereço ou tente WhatsApp. Se configurou FormSubmit, confirme o email uma vez no site formsubmit.co.'
-        : 'WhatsApp automático requer webhook nas Configurações (whatsappCodeWebhook). Contacte a loja ou use email.') };
+        ? 'Não foi possível enviar o email. Confirme o endereço (FormSubmit pode pedir confirmação na 1.ª vez) ou use WhatsApp.'
+        : 'WhatsApp: configure a API Key do CallMeBot em Admin → Configurações. Sem a key, use verificação por email.') };
   },
 
   async validarCodigoVerificacao({ destino, codigo, finalidade }) {
