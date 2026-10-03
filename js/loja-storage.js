@@ -999,6 +999,14 @@ const LojaDB = {
     if (!name && !settings.logoUrl) return;
     const logo = this.resolveLogoUrl(settings.logoUrl);
     document.querySelectorAll('#brandName, #footerName').forEach(el => { if (el) el.textContent = name; });
+    if (logo) {
+      try {
+        document.querySelectorAll('link[rel="icon"],link[rel="shortcut icon"]').forEach(function(l){ l.href = logo; });
+        if (!document.querySelector('link[rel="icon"]')) {
+          var lf = document.createElement('link'); lf.rel = 'icon'; lf.href = logo; document.head.appendChild(lf);
+        }
+      } catch (e) {}
+    }
     document.querySelectorAll('#brandLogo').forEach(el => {
       if (!el) return;
       el.style.display = '';
